@@ -2,10 +2,13 @@
 import { buildClimatePrompt, fetchAiAnalysis } from './text_gen.js'; 
 
 let map; 
-let tempChart, seaChart, co2Chart, customChart;
-let climateData = []; 
+let tempChart, precipChart, co2Chart, customChart;
+let tempData = [];
+let precipData = [];
 
-
+// ----------------------------
+// Initialize dashboard & charts
+// ----------------------------
 function initializeDashboard() {
     console.log("Dashboard initialized. Loading map and charts...");
 
@@ -16,152 +19,137 @@ function initializeDashboard() {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    // Initialize Chart.js instances
+    // Temperature chart
     tempChart = new Chart(document.getElementById('chart-temp'), {
         type: 'line',
-        data: { labels: [], datasets: [{ label: 'Temperature (°C)', data: [], borderColor: '#FF5733', backgroundColor: 'rgba(255, 87, 51, 0.1)' }] },
+        data: { labels: [], datasets: [{ label: 'Temperature (°C)', data: [], borderColor: '#FF5733', backgroundColor: 'rgba(255,87,51,0.1)' }] },
         options: { responsive: true, maintainAspectRatio: false,
             scales: { y: { beginAtZero: false, grid: { color: '#333' } }, x: { grid: { color: '#333' } } },
             plugins: { legend: { labels: { color: '#e0e0e0' } } }
         }
     });
 
-    seaChart = new Chart(document.getElementById('chart-sea'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ label: 'Sea Level Rise (mm)', data: [], backgroundColor: '#33A0FF' }] },
-        options: { responsive: true, maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { color: '#333' } } },
-            plugins: { legend: { labels: { color: '#e0e0e0' } } }
-        }
-    });
-
-    co2Chart = new Chart(document.getElementById('chart-co2'), {
+    // Precipitation chart
+    precipChart = new Chart(document.getElementById('chart-precip'), {
         type: 'line',
-        data: { labels: [], datasets: [{ label: 'CO₂ (ppm)', data: [], borderColor: '#8A2BE2', backgroundColor: 'rgba(138, 43, 226, 0.1)', fill: true }] },
+        data: { labels: [], datasets: [{ label: 'Precipitation (mm)', data: [], borderColor: '#33A0FF', backgroundColor: 'rgba(51,160,255,0.1)' }] },
         options: { responsive: true, maintainAspectRatio: false,
             scales: { y: { beginAtZero: false, grid: { color: '#333' } }, x: { grid: { color: '#333' } } },
             plugins: { legend: { labels: { color: '#e0e0e0' } } }
         }
     });
 
-    customChart = new Chart(document.getElementById('chart-custom'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ label: 'Regional Data', data: [], backgroundColor: '#4CAF50' }] },
-        options: { responsive: true, maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { color: '#333' } } },
-            plugins: { legend: { labels: { color: '#e0e0e0' } } }
-        }
-    });
-
-    // Load CSV data
+    // Load temperature CSV
     Papa.parse('./tidy-temperature.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
         complete: function(results) {
-            climateData = results.data;
-            console.log("CSV data loaded:", climateData.length, "rows");
+            tempData = results.data;
+            console.log("Temperature CSV loaded:", tempData.length, "rows");
+            updateGlobalCharts();
+        }
+    });
 
-            // Show global metrics by default
+    // Load precipitation CSV
+    Papa.parse('./tidy-percipitation.csv', {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        complete: function(results) {
+            precipData = results.data;
+            console.log("Precipitation CSV loaded:", precipData.length, "rows");
             updateGlobalCharts();
         }
     });
 }
 
-// Normalize country names for matching
+// ----------------------------
+// Helpers for country & global data
+// ----------------------------
 function normalizeCountry(name) {
     return name.replace(/\s*\(.*\)/, '').trim().toLowerCase();
 }
 
-// Get country data
-function getCountryData(searchName) {
+function getCountryData(dataset, searchName) {
     const normSearch = normalizeCountry(searchName);
-    const filtered = climateData.filter(d => normalizeCountry(d.name) === normSearch);
-    filtered.sort((a, b) => new Date(a.year) - new Date(b.year));
-    const labels = filtered.map(d => new Date(d.year).getFullYear());
-    const values = filtered.map(d => d.value);
-    return { labels, values };
+    const filtered = dataset.filter(d => normalizeCountry(d.name) === normSearch);
+    filtered.sort((a,b) => new Date(a.year) - new Date(b.year));
+    return {
+        labels: filtered.map(d => new Date(d.year).getFullYear()),
+        values: filtered.map(d => d.value)
+    };
 }
 
-// Get global averages per year
-function getGlobalData() {
+function getGlobalData(dataset) {
     const byYear = {};
-    climateData.forEach(d => {
+    dataset.forEach(d => {
         const year = new Date(d.year).getFullYear();
         if (!byYear[year]) byYear[year] = [];
         byYear[year].push(d.value);
     });
-
     const labels = Object.keys(byYear).sort((a,b)=>a-b);
-    const values = labels.map(y => {
-        const vals = byYear[y];
-        return (vals.reduce((sum,v)=>sum+v,0)/vals.length).toFixed(2);
-    });
-
+    const values = labels.map(y => (byYear[y].reduce((sum,v)=>sum+v,0)/byYear[y].length).toFixed(2));
     return { labels, values };
 }
 
-// Update charts with global data
+// ----------------------------
+// Update charts
+// ----------------------------
 function updateGlobalCharts() {
-    const { labels, values } = getGlobalData();
-
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = values;
-    tempChart.data.datasets[0].label = `Global Avg Temperature (°C)`;
+    // Temperature
+    const tempGlobal = getGlobalData(tempData);
+    tempChart.data.labels = tempGlobal.labels;
+    tempChart.data.datasets[0].data = tempGlobal.values;
+    tempChart.data.datasets[0].label = "Global Avg Temperature (°C)";
     tempChart.update();
 
-    customChart.data.labels = labels;
-    customChart.data.datasets[0].data = values;
-    customChart.data.datasets[0].label = `Global Regional Metric`;
-    customChart.update();
+    // Precipitation
+    const precipGlobal = getGlobalData(precipData);
+    precipChart.data.labels = precipGlobal.labels;
+    precipChart.data.datasets[0].data = precipGlobal.values;
+    precipChart.data.datasets[0].label = "Global Avg Precipitation (mm)";
+    precipChart.update();
 }
 
-// Update charts with country-specific data
 function updateCountryCharts(countryName) {
-    const { labels, values } = getCountryData(countryName);
-    if(labels.length === 0) {
-        console.warn(`No CSV data for "${countryName}"`);
-        updateGlobalCharts();
-        return;
+    const tempCountry = getCountryData(tempData, countryName);
+    const precipCountry = getCountryData(precipData, countryName);
+
+    if(tempCountry.labels.length>0) {
+        tempChart.data.labels = tempCountry.labels;
+        tempChart.data.datasets[0].data = tempCountry.values;
+        tempChart.data.datasets[0].label = `${countryName} Temperature (°C)`;
+        tempChart.update();
     }
 
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = values;
-    tempChart.data.datasets[0].label = `${countryName} Temperature (°C)`;
-    tempChart.update();
-
-    customChart.data.labels = labels;
-    customChart.data.datasets[0].data = values;
-    customChart.data.datasets[0].label = `${countryName} Regional Metric`;
-    customChart.update();
+    if(precipCountry.labels.length>0) {
+        precipChart.data.labels = precipCountry.labels;
+        precipChart.data.datasets[0].data = precipCountry.values;
+        precipChart.data.datasets[0].label = `${countryName} Precipitation (mm)`;
+        precipChart.update();
+    }
 }
 
-// Geocoding function
-async function geocodeLocation(location) { 
+// ----------------------------
+// Geocoding & search
+// ----------------------------
+async function geocodeLocation(location) {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
     try {
         const response = await fetch(url);
-        if(!response.ok) throw new Error('Geocoding failed');
+        if(!response.ok) throw new Error("Geocoding failed");
         const data = await response.json();
-        if(data && data.length>0) {
-            const result = data[0];
-            const nameParts = result.display_name.split(',').map(s=>s.trim());
+        if(data.length>0){
+            const r = data[0];
+            const nameParts = r.display_name.split(',').map(s=>s.trim());
             const displayLocation = nameParts.length>1 ? nameParts[0]+', '+nameParts.slice(-1)[0] : nameParts[0];
-            return {
-                lat: parseFloat(result.lat),
-                lon: parseFloat(result.lon),
-                locationName: displayLocation,
-                bbox: result.boundingbox.map(Number)
-            };
+            return { lat: parseFloat(r.lat), lon: parseFloat(r.lon), locationName: displayLocation, bbox: r.boundingbox.map(Number) };
         }
         return null;
-    } catch(err) {
-        console.error("Geocoding error:", err);
-        return null;
-    }
+    } catch(err){ console.error(err); return null; }
 }
 
-// Handle search
 async function handleSearch() {
     const searchInput = document.getElementById('location-search');
     const location = searchInput.value.trim();
@@ -170,7 +158,7 @@ async function handleSearch() {
     searchButton.textContent = 'Searching...';
     searchButton.disabled = true;
 
-    if(!location) {
+    if(!location){
         updateGlobalCharts();
         searchButton.textContent = 'Search Impact';
         searchButton.disabled = false;
@@ -182,7 +170,7 @@ async function handleSearch() {
     searchButton.textContent = 'Search Impact';
     searchButton.disabled = false;
 
-    if(coords) {
+    if(coords){
         map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
         L.marker([coords.lat, coords.lon]).addTo(map)
             .bindPopup(`Impact Data for <b>${coords.locationName}</b>`).openPopup();
@@ -198,8 +186,7 @@ async function handleSearch() {
             tempAnomaly: (Math.random()*0.5+0.8).toFixed(2),
             seaLevelRise: (Math.random()*1+3).toFixed(1)
         };
-        const metaPrompt = buildClimatePrompt(coords.locationName, coords.lat.toFixed(4), coords.lon.toFixed(4), mockClimateData);
-        fetchAiAnalysis(metaPrompt);
+        fetchAiAnalysis(buildClimatePrompt(coords.locationName, coords.lat.toFixed(4), coords.lon.toFixed(4), mockClimateData));
 
     } else {
         alert(`Could not find "${location}".`);
@@ -207,8 +194,9 @@ async function handleSearch() {
     }
 }
 
-// Event listeners
+// ----------------------------
+// Event listeners & initialization
+// ----------------------------
 document.getElementById('search-button').addEventListener('click', handleSearch);
 document.getElementById('location-search').addEventListener('keypress', e => { if(e.key==='Enter'){ e.preventDefault(); handleSearch(); } });
-
 window.onload = initializeDashboard;
