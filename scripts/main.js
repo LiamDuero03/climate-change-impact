@@ -19,6 +19,9 @@ function initializeDashboard() {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
+    // 🌟 NEW: Attach click handler to the map
+    map.on('click', handleMapClick); 
+
     // 2. Chart Initialization 
     const tempCtx = document.getElementById('chart-temp');
     if (tempCtx) { 
@@ -69,7 +72,7 @@ function initializeDashboard() {
 }
 
 // ----------------------------
-// Helpers for country & global data (ADDED NEW HELPER)
+// Helpers for country & global data (UNCHANGED)
 // ----------------------------
 function normalizeCountry(name) {
     if (!name || typeof name !== 'string') {
@@ -97,26 +100,18 @@ function getCountryData(dataset, searchName) {
     };
 }
 
-/**
- * 🌟 NEW HELPER: Finds the latest data point for a given metric/country.
- * @param {Array} dataset - The tempData or precipData array.
- * @param {string} countryName - The normalized country name.
- * @returns {object} { year, value }
- */
 function getLatestMetric(dataset, countryName) {
     const data = getCountryData(dataset, countryName);
     if (data.labels.length === 0) {
         return { year: 'N/A', value: 'N/A' };
     }
     
-    // The data is already sorted by year in getCountryData, so the last element is the latest.
     const latestIndex = data.labels.length - 1;
     return {
         year: data.labels[latestIndex],
         value: parseFloat(data.values[latestIndex]).toFixed(2)
     };
 }
-
 
 function getGlobalData(dataset) {
     const validDataset = dataset.filter(d => d.year && d.value !== null && d.value !== undefined);
@@ -131,6 +126,65 @@ function getGlobalData(dataset) {
     const values = labels.map(y => (byYear[y].reduce((sum,v)=>sum+v,0)/byYear[y].length).toFixed(2));
     return { labels, values };
 }
+
+function determinePrimaryRisk(countryName) {
+    const tempHistorical = getCountryData(tempData, countryName).values.map(Number);
+    const precipHistorical = getCountryData(precipData, countryName).values.map(Number);
+
+    if (tempHistorical.length < 35 || precipHistorical.length < 35) {
+        return { 
+            primaryRisk: 'Insufficient Data', 
+            magnitude: 'N/A', 
+            tempAnomaly: 'N/A', 
+            precipChange: 'N/A' 
+        };
+    }
+
+    const T_baseline = tempHistorical.slice(0, 30).reduce((a, b) => a + b) / 30;
+    const P_baseline = precipHistorical.slice(0, 30).reduce((a, b) => a + b) / 30;
+    const T_current = tempHistorical.slice(-5).reduce((a, b) => a + b) / 5;
+    const P_current = precipHistorical.slice(-5).reduce((a, b) => a + b) / 5;
+
+    const tempAnomaly = T_current - T_baseline; 
+    const precipChangePercent = ((P_current - P_baseline) / P_baseline) * 100;
+
+    let tempRiskScore = 0;
+    if (tempAnomaly >= 1.5) tempRiskScore = 3; 
+    else if (tempAnomaly >= 1.0) tempRiskScore = 2; 
+    else if (tempAnomaly > 0) tempRiskScore = 1; 
+
+    let precipRiskScore = 0;
+    const absPrecipChange = Math.abs(precipChangePercent);
+
+    if (precipChangePercent < -10) precipRiskScore = 3; 
+    else if (absPrecipChange >= 15) precipRiskScore = 2.5; 
+    else if (absPrecipChange >= 5) precipRiskScore = 2; 
+    else if (absPrecipChange > 0) precipRiskScore = 1; 
+
+    let primaryRisk = 'Monitor Change';
+    let riskMagnitude = 'Low';
+
+    if (tempRiskScore > precipRiskScore) {
+        primaryRisk = 'Temperature: Heatwave & Warming Trend';
+        if (tempRiskScore === 3) riskMagnitude = 'High';
+        else if (tempRiskScore === 2) riskMagnitude = 'Medium';
+    } else if (precipRiskScore > tempRiskScore) {
+        primaryRisk = precipChangePercent < 0 ? 'Precipitation: Drought Risk' : 'Precipitation: Flood/Rainfall Increase';
+        if (precipRiskScore >= 2.5) riskMagnitude = 'High';
+        else if (precipRiskScore === 2) riskMagnitude = 'Medium';
+    } else if (tempRiskScore > 0) {
+        primaryRisk = 'Both Metrics Show Significant Change';
+        riskMagnitude = tempRiskScore === 3 ? 'High' : 'Medium';
+    }
+
+    return {
+        primaryRisk: primaryRisk,
+        magnitude: riskMagnitude,
+        tempAnomaly: tempAnomaly.toFixed(2),
+        precipChange: precipChangePercent.toFixed(1)
+    };
+}
+
 
 // ----------------------------
 // Update charts (UNCHANGED)
@@ -183,7 +237,7 @@ function updateCountryCharts(countryName) {
 }
 
 // ----------------------------
-// Geocoding & search
+// Geocoding & search (UNCHANGED)
 // ----------------------------
 async function geocodeLocation(location) {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
@@ -211,6 +265,96 @@ async function geocodeLocation(location) {
     } catch(err){ console.error(err); return null; }
 }
 
+async function reverseGeocode(lat, lon) {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    try {
+        const response = await fetch(url);
+        if(!response.ok) throw new Error("Reverse Geocoding failed");
+        const data = await response.json();
+        
+        if (data.address && data.address.country) {
+            return {
+                countryName: data.address.country,
+                locationName: data.display_name.split(',').slice(0, 3).join(', ') 
+            };
+        }
+        return null;
+    } catch(err){ console.error("Reverse Geocoding Error:", err); return null; }
+}
+
+/**
+ * 🌟 NEW: Consolidated function to update the map, charts, and AI analysis.
+ */
+async function updateDashboard(lat, lon, countryName, locationName, bbox = null) {
+    const chartLookupName = countryName;
+    
+    // 1. Get metrics and risk assessment
+    const latestTemp = getLatestMetric(tempData, chartLookupName);
+    const latestPrecip = getLatestMetric(precipData, chartLookupName);
+    const riskAssessment = determinePrimaryRisk(chartLookupName); 
+
+    // 2. Build the popup content
+    let popupContent = `
+        <b>${locationName}</b>
+        <hr style="margin: 4px 0;">
+        <p>Data Source: ${countryName}</p>
+        <p style="margin-bottom: 8px;">
+            🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b> | 
+            💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b>
+        </p>
+        <hr style="margin: 4px 0;">
+        <p style="font-size: 1.1em; font-weight: bold; color: ${riskAssessment.magnitude === 'High' ? '#FF5733' : '#FFC300'};">
+            🚨 Primary Risk: ${riskAssessment.primaryRisk} (${riskAssessment.magnitude})
+        </p>
+        <p style="font-size: 0.9em; margin-top: 4px;">
+            Anomaly: +${riskAssessment.tempAnomaly}°C | Change: ${riskAssessment.precipChange}%
+        </p>
+    `;
+
+    // 3. Map updates
+    map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
+    const newMarker = L.marker([lat, lon]) // Store marker reference
+        .addTo(map)
+        .bindPopup(popupContent); 
+    
+    // Check for Bounding Box (from search)
+    if(bbox) {
+        map.fitBounds([[bbox[0], bbox[2]],[bbox[1], bbox[3]]], {padding:[50,50], maxZoom:10});
+    } else {
+        // If no BBOX (i.e., map click), zoom slightly if needed
+        map.setView([lat, lon], map.getZoom() > 5 ? map.getZoom() : 5); 
+    }
+
+    // 🌟 FIX: Force the map view to the marker location *after* zoom/pan/fitBounds
+    // This ensures the popup is centered and visible.
+    map.setView(newMarker.getLatLng(), map.getZoom(), {
+        animate: true,
+        pan: {
+            duration: 0.5
+        }
+    });
+    newMarker.openPopup(); // Re-open the popup after map movement
+
+    // 4. Update charts
+    updateCountryCharts(chartLookupName);
+
+    // 5. AI analysis 
+    // 🌟 FIX: Pass the full risk assessment data structure to the AI function
+    const aiClimateData = {
+        currentAvgTemp: latestTemp.value,
+        tempAnomaly: riskAssessment.tempAnomaly,
+        seaLevelRise: (Math.random()*1+3).toFixed(1), // Retain mock sea level data
+        // Pass the new risk metrics:
+        primaryRisk: riskAssessment.primaryRisk,
+        magnitude: riskAssessment.magnitude,
+        precipChange: riskAssessment.precipChange
+    };
+    fetchAiAnalysis(buildClimatePrompt(chartLookupName, lat.toFixed(4), lon.toFixed(4), aiClimateData));
+}
+
+// ----------------------------
+// Search Handler (MODIFIED TO USE updateDashboard - UNCHANGED)
+// ----------------------------
 async function handleSearch() {
     const searchInput = document.getElementById('location-search');
     const location = searchInput.value.trim();
@@ -232,45 +376,42 @@ async function handleSearch() {
     searchButton.disabled = false;
 
     if(coords){
-        const chartLookupName = coords.countryName;
-        
-        // 🌟 NEW: Get the latest metrics for display
-        const latestTemp = getLatestMetric(tempData, chartLookupName);
-        const latestPrecip = getLatestMetric(precipData, chartLookupName);
-
-        // 🌟 NEW: Build the popup content with inline metrics
-        let popupContent = `
-            <b>${coords.locationName}</b>
-            <hr style="margin: 4px 0;">
-            <p>🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b></p>
-            <p>💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b></p>
-        `;
-
-        // Map updates
-        map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
-        L.marker([coords.lat, coords.lon])
-            .addTo(map)
-            .bindPopup(popupContent).openPopup(); // Use the rich content here
-        
-        if(coords.bbox) map.fitBounds([[coords.bbox[0], coords.bbox[2]],[coords.bbox[1], coords.bbox[3]]], {padding:[50,50], maxZoom:10});
-        else map.setView([coords.lat, coords.lon], 10);
-
-        // Update charts with country data
-        updateCountryCharts(chartLookupName);
-
-        // AI analysis (optional)
-        const mockClimateData = {
-            currentAvgTemp: (Math.random()*5+10).toFixed(2),
-            tempAnomaly: (Math.random()*0.5+0.8).toFixed(2),
-            seaLevelRise: (Math.random()*1+3).toFixed(1)
-        };
-        fetchAiAnalysis(buildClimatePrompt(chartLookupName, coords.lat.toFixed(4), coords.lon.toFixed(4), mockClimateData));
-
+        await updateDashboard(
+            coords.lat, 
+            coords.lon, 
+            coords.countryName, 
+            coords.locationName, 
+            coords.bbox
+        );
     } else {
         alert(`Could not find "${location}".`);
         updateGlobalCharts();
     }
 }
+
+/**
+ * 🌟 NEW: Handles map click event (MODIFIED TO USE updateDashboard - UNCHANGED)
+ */
+async function handleMapClick(e) {
+    const lat = e.latlng.lat;
+    const lon = e.latlng.lng;
+
+    const result = await reverseGeocode(lat, lon);
+
+    if (result && result.countryName) {
+        console.log(`Map Clicked: Country found: ${result.countryName}`);
+        
+        await updateDashboard(
+            lat, 
+            lon, 
+            result.countryName, 
+            result.locationName
+        );
+    } else {
+        alert("Could not retrieve country data for this location. Try searching or clicking closer to land.");
+    }
+}
+
 
 // ----------------------------
 // Event listeners & initialization (UNCHANGED)
