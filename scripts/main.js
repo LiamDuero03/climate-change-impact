@@ -4,9 +4,11 @@ let countriesGeoJson = null;
 import { buildClimatePrompt, fetchAiAnalysis } from './text_gen.js'; 
 
 let map; 
-let tempChart, precipChart, co2Chart, customChart; 
+// 🌟 MODIFICATION: Removed customChart as it will display text, not a chart canvas
+let tempChart, precipChart, rainChart, co2Chart; 
 let tempData = [];
 let precipData = [];
+let rainData = []; // Correctly declared globally
 let countryLayer = null; // 🌟 NEW: Global variable to store the current country highlight layer
 
 // ----------------------------
@@ -28,8 +30,7 @@ function initializeDashboard() {
     // 🌟 NEW: Attach click handler to the map
     map.on('click', handleMapClick); 
 
-    // ... (rest of initializeDashboard remains the same) ...
-    // 2. Chart Initialization (UNCHANGED)
+    // 2. Chart Initialization
     const tempCtx = document.getElementById('chart-temp');
     if (tempCtx) { 
         tempChart = new Chart(tempCtx, {
@@ -53,8 +54,49 @@ function initializeDashboard() {
             }
         });
     }
+
+    // 🌟 NEW: Initialize Rain Extremities Chart
+    const rainCtx = document.getElementById('chart-rain-days'); 
+    if (rainCtx) { 
+        rainChart = new Chart(rainCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ 
+                label: 'Extreme Rain Days (20mm+)', 
+                data: [], 
+                borderColor: '#1f6e2e', // A green color for rain
+                backgroundColor: 'rgba(31,110,46,0.1)' 
+            }] },
+            options: { responsive: true, maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { color: '#333' } } },
+                plugins: { legend: { labels: { color: '#e0e0e0' } } }
+            }
+        });
+    }
     
-    // 3. Load CSV data (Papa Parse) (UNCHANGED)
+    // NOTE: Initialization for chart-custom is removed here.
+    
+    // 3. Load CSV data (Papa Parse) 
+    // 🌟 OPTIMIZATION: Only call updateGlobalCharts() once after all data is loaded.
+    let loadedCount = 0;
+    const expectedLoads = 3;
+
+    const checkAndInitializeCharts = () => {
+        loadedCount++;
+        if (loadedCount === expectedLoads) {
+            updateGlobalCharts();
+            // 🌟 CUSTOM PANEL: Set initial message for the custom panel
+            const customPanel = document.getElementById('graph-custom');
+            if (customPanel) {
+                customPanel.innerHTML = `
+                    <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Regional Metrics & Assessment</h3>
+                    <div class="p-4 bg-gray-800 rounded-lg">
+                        <p class="text-gray-300 italic">Select a location on the map or use the search bar to view a detailed climate risk summary.</p>
+                    </div>
+                `;
+            }
+        }
+    };
+    
     Papa.parse('./data/tidy-temperature.csv', {
         download: true,
         header: true,
@@ -62,7 +104,7 @@ function initializeDashboard() {
         complete: function(results) {
             tempData = results.data.filter(row => row.name && row.value !== null);
             console.log("Temperature CSV loaded:", tempData.length, "rows");
-            updateGlobalCharts();
+            checkAndInitializeCharts();
         }
     });
 
@@ -73,7 +115,18 @@ function initializeDashboard() {
         complete: function(results) {
             precipData = results.data.filter(row => row.name && row.value !== null);
             console.log("Precipitation CSV loaded:", precipData.length, "rows");
-            updateGlobalCharts();
+            checkAndInitializeCharts();
+        }
+    });
+    
+    Papa.parse('./data/tidy-20mmrainfall_days.csv', {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        complete: function(results) {
+            rainData = results.data.filter(row => row.name && row.value !== null);
+            console.log("Rainfall Extremeties CSV loaded:", rainData.length, "rows");
+            checkAndInitializeCharts();
         }
     });
 }
@@ -230,10 +283,10 @@ function getRiskColor(magnitude) {
 
 
 // ----------------------------
-// Update charts (UNCHANGED)
+// Update charts
 // ----------------------------
 function updateGlobalCharts() {
-    if (!tempChart || !precipChart) return; 
+    if (!tempChart || !precipChart || !rainChart) return; 
 
     // Temperature
     const tempGlobal = getGlobalData(tempData);
@@ -248,14 +301,22 @@ function updateGlobalCharts() {
     precipChart.data.datasets[0].data = precipGlobal.values;
     precipChart.data.datasets[0].label = "Global Avg Precipitation (mm)";
     precipChart.update();
+
+    // Rain
+    const rainGlobal = getGlobalData(rainData);
+    rainChart.data.labels = rainGlobal.labels;
+    rainChart.data.datasets[0].data = rainGlobal.values;
+    rainChart.data.datasets[0].label = "Global Extreme Rain Day (20mm+)";
+    rainChart.update();
 }
 
 function updateCountryCharts(countryName) {
-    if (!tempChart || !precipChart) return; 
+    if (!tempChart || !precipChart || !rainChart) return; 
     
     const tempCountry = getCountryData(tempData, countryName);
     const precipCountry = getCountryData(precipData, countryName);
-
+    const rainCountry = getCountryData(rainData, countryName); 
+    
     // Temperature
     if(tempCountry.labels.length>0) {
         tempChart.data.labels = tempCountry.labels;
@@ -275,6 +336,17 @@ function updateCountryCharts(countryName) {
         precipChart.update();
     } else {
         console.warn(`No precipitation data found for ${countryName}. Reverting to global view.`);
+        updateGlobalCharts();
+    }
+
+    // Rain
+    if(rainCountry.labels.length>0) {
+        rainChart.data.labels = rainCountry.labels;
+        rainChart.data.datasets[0].data = rainCountry.values; 
+        rainChart.data.datasets[0].label = `${countryName} Extreme Rain Days (20mm+)`; // Improved label
+        rainChart.update();
+    } else {
+        console.warn(`No extreme rain days data found for ${countryName}. Reverting to global view.`); 
         updateGlobalCharts();
     }
 }
@@ -300,7 +372,7 @@ async function geocodeLocation(location) {
                 lat: parseFloat(r.lat), 
                 lon: parseFloat(r.lon), 
                 locationName: displayLocation, 
-                countryName: country,      
+                countryName: country,       
                 bbox: r.boundingbox.map(Number) 
             };
         }
@@ -344,7 +416,6 @@ function highlightCountryLayer(countryName, riskMagnitude, coords) {
 
         // Find the feature in the GeoJSON data
         const feature = countriesGeoJson.features.find(f => {
-            // Adjust property name based on your GeoJSON file's structure (e.g., 'name', 'country', 'ADMIN')
             // This assumes the GeoJSON property is 'name' and can be normalized
             return f.properties.name && normalizeCountry(f.properties.name) === normCountryName;
         });
@@ -395,7 +466,8 @@ function highlightCountryLayer(countryName, riskMagnitude, coords) {
 }
 
 /**
- * 🌟 NEW: Consolidated function to update the map, charts, and AI analysis.
+ * 🌟 MODIFIED: Consolidated function to update the map, charts, and AI analysis.
+ * Now injects risk assessment into the custom panel div.
  */
 async function updateDashboard(lat, lon, countryName, locationName, bbox = null) {
     const chartLookupName = countryName;
@@ -404,12 +476,41 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
     const latestTemp = getLatestMetric(tempData, chartLookupName);
     const latestPrecip = getLatestMetric(precipData, chartLookupName);
     const riskAssessment = determinePrimaryRisk(chartLookupName); 
+    const latestRain = getLatestMetric(rainData, chartLookupName);
+    const riskColor = getRiskColor(riskAssessment.magnitude);
 
     // 2. Apply risk color coding & get marker style
-    // 🌟 Pass countryName to the highlight function for GeoJSON lookup
     const markerIcon = highlightCountryLayer(countryName, riskAssessment.magnitude, { bbox: bbox });
 
-    // 3. Build the popup content
+    // 3. Build the content for the Custom Panel (#graph-custom)
+    let customPanelContent = `
+        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Regional Metrics & Assessment</h3>
+        <div class="p-4 bg-gray-800 rounded-lg">
+            <b>${locationName}</b>
+            <hr style="margin: 4px 0; border-color: #333;">
+            <p class="text-sm text-gray-400">Data Source: ${countryName}</p>
+            <div class="flex flex-col gap-2 mt-3 text-base">
+                <p>🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b></p> 
+                <p>💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b></p>
+                <p>⛈️ Extreme Rain Days (${latestRain.year}): <b>${latestRain.value} days</b></p>
+            </div>
+            <hr style="margin: 12px 0; border-color: #333;">
+            <p style="font-size: 1.1em; font-weight: bold; color: ${riskColor};">
+                🚨 Primary Risk: ${riskAssessment.primaryRisk} (${riskAssessment.magnitude})
+            </p>
+            <p style="font-size: 0.9em; margin-top: 4px; color: #ccc;">
+                Temperature Anomaly: <b>+${riskAssessment.tempAnomaly}°C</b><br>
+                Precipitation Change: <b>${riskAssessment.precipChange}%</b> (vs. baseline)
+            </p>
+        </div>
+    `;
+    
+    const customPanel = document.getElementById('graph-custom');
+    if (customPanel) {
+        customPanel.innerHTML = customPanelContent;
+    }
+
+    // 4. Build the popup content (Simplified for the map marker)
     let popupContent = `
         <b>${locationName}</b>
         <hr style="margin: 4px 0;">
@@ -418,16 +519,12 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
             🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b> | 
             💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b>
         </p>
-        <hr style="margin: 4px 0;">
-        <p style="font-size: 1.1em; font-weight: bold; color: ${getRiskColor(riskAssessment.magnitude)};">
-            🚨 Primary Risk: ${riskAssessment.primaryRisk} (${riskAssessment.magnitude})
-        </p>
-        <p style="font-size: 0.9em; margin-top: 4px;">
-            Anomaly: +${riskAssessment.tempAnomaly}°C | Change: ${riskAssessment.precipChange}%
+        <p style="font-weight: bold; color: ${riskColor};">
+            Risk: ${riskAssessment.magnitude}
         </p>
     `;
 
-    // 4. Map updates
+    // 5. Map updates
     map.eachLayer(layer => { 
         if(layer instanceof L.Marker) {
             map.removeLayer(layer); 
@@ -455,10 +552,10 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
     });
     newMarker.openPopup(); 
 
-    // 5. Update charts
+    // 6. Update the remaining three charts (Temp, Precip, Rain)
     updateCountryCharts(chartLookupName);
 
-    // 6. AI analysis 
+    // 7. AI analysis 
     const aiClimateData = {
         currentAvgTemp: latestTemp.value,
         tempAnomaly: riskAssessment.tempAnomaly,
