@@ -1,196 +1,153 @@
-// 🌟 NEW: Import AI analysis functions from the module file
-import { buildClimatePrompt, fetchAiAnalysis } from './text_gen.js'; 
+let map; // Global variable to hold the Leaflet map instance
+// Global variables for Chart.js instances
+let tempChart, seaChart, co2Chart, customChart;
 
-let map;
-// NOTE: Global chart variables should NOT be re-declared here if they were declared globally
-// in the original file, but we will keep them for safety in the unified file context.
-let tempChart, seaChart, co2Chart, customChart; 
-let climateDataCache = null; // Cache API data for faster subsequent searches
-
-// Helper: convert monthly data to yearly averages
-function monthlyToYearlyAvg(monthlyArray) {
-    const yearly = [];
-    for (let i = 0; i < monthlyArray.length; i += 12) {
-        // Ensure that the monthly data item is an object with a 'value' property
-        const yearSlice = monthlyArray.slice(i, i + 12);
-        
-        // Filter out null/undefined values before summing
-        const validValues = yearSlice.filter(v => v !== null && v.value !== null).map(v => v.value);
-        
-        if (validValues.length > 0) {
-            const sum = validValues.reduce((acc, v) => acc + v, 0);
-            yearly.push(sum / validValues.length);
-        } else {
-            yearly.push(null); // Push null if no data for the year
-        }
-    }
-    return yearly;
-}
-
-// Initialize dashboard and placeholder charts
+// Function to initialize the map and placeholders
 function initializeDashboard() {
+    console.log("Dashboard initialized. Loading map and charts...");
+
+    // 1. Initialize Leaflet Map
+    // Set view to center (20, 0) and zoom level 2 (world view)
     map = L.map('impact-map').setView([20, 0], 2);
 
+    // Add OpenStreetMap tiles (the visual layer of the map)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    // Placeholder charts
-    const ctxIds = ['chart-temp', 'chart-sea', 'chart-co2', 'chart-custom'];
-    ctxIds.forEach(id => {
-        const ctx = document.getElementById(id).getContext('2d');
-        new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] } });
+    // 2. Initialize Chart.js instances (Simple placeholder charts)
+    // NOTE: Setting maintainAspectRatio: false is crucial since we defined h-64 in HTML
+    
+    // Temperature Anomaly Chart
+    tempChart = new Chart(document.getElementById('chart-temp'), {
+        type: 'line',
+        data: { 
+            labels: ['2000', '2010', '2020'], 
+            datasets: [{ 
+                label: 'Global Temp Anomaly (°C)', 
+                data: [0.2, 0.5, 0.8], 
+                borderColor: '#FF5733', // Reddish-orange for heat
+                backgroundColor: 'rgba(255, 87, 51, 0.1)'
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { 
+                y: { beginAtZero: false, grid: { color: '#333' } },
+                x: { grid: { color: '#333' } }
+            },
+            plugins: { legend: { labels: { color: '#e0e0e0' } } }
+        }
     });
-}
 
-// Geocode location
+    // Sea Level Change Chart
+    seaChart = new Chart(document.getElementById('chart-sea'), {
+        type: 'bar',
+        data: { 
+            labels: ['1993', '2005', '2018'], 
+            datasets: [{ 
+                label: 'Sea Level Rise (mm)', 
+                data: [0, 40, 90],
+                backgroundColor: '#33A0FF', // Blue for water
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { 
+                y: { beginAtZero: true, grid: { color: '#333' } },
+                x: { grid: { color: '#333' } }
+            },
+            plugins: { legend: { labels: { color: '#e0e0e0' } } }
+        }
+    });
+
+    // CO2 Concentration Chart (Placeholder, usually global data)
+    co2Chart = new Chart(document.getElementById('chart-co2'), {
+        type: 'line',
+        data: { 
+            labels: ['2000', '2010', '2020'], 
+            datasets: [{ 
+                label: 'CO₂ (ppm)', 
+                data: [369, 390, 412], 
+                borderColor: '#8A2BE2', // Purple for atmospheric data
+                backgroundColor: 'rgba(138, 43, 226, 0.1)',
+                fill: true
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { 
+                y: { beginAtZero: false, grid: { color: '#333' } },
+                x: { grid: { color: '#333' } }
+            },
+            plugins: { legend: { labels: { color: '#e0e0e0' } } }
+        }
+    });
+
+    // Regional Metric Chart (Starts empty)
+    customChart = new Chart(document.getElementById('chart-custom'), {
+        type: 'bar',
+        data: { 
+            labels: [], 
+            datasets: [{ 
+                label: 'Regional Data', 
+                data: [],
+                backgroundColor: '#4CAF50', // Primary green color
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { 
+                y: { beginAtZero: true, grid: { color: '#333' } },
+                x: { grid: { color: '#333' } }
+            },
+            plugins: { legend: { labels: { color: '#e0e0e0' } } }
+        }
+    });
+
+} // End of initializeDashboard function
+
+// Function to perform geocoding using the Nominatim API (No changes needed here)
 async function geocodeLocation(location) {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
+
     try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Geocode failed');
+        if (!response.ok) {
+            throw new Error('Geocoding request failed');
+        }
         const data = await response.json();
+        
         if (data && data.length > 0) {
-            const r = data[0];
+            const result = data[0];
             return {
-                lat: parseFloat(r.lat),
-                lon: parseFloat(r.lon),
-                // Extract country name from the end of the display name string
-                country: r.display_name.split(',').slice(-1)[0].trim(),
-                bbox: r.boundingbox.map(c => parseFloat(c))
+                lat: parseFloat(result.lat),
+                lon: parseFloat(result.lon),
+                bbox: result.boundingbox.map(coord => parseFloat(coord))
             };
         }
         return null;
-    } catch (err) { console.error(err); return null; }
+    } catch (error) {
+        console.error("Geocoding Error:", error);
+        return null;
+    }
 }
 
-// Fetch climate data (cached) - World Bank API
-async function fetchClimateData() {
-    if (climateDataCache) return climateDataCache;
-
-    const endpoint = 'https://cckpapi.worldbank.org/api/v1/cru-x0.5_timeseries_tas,pr_timeseries_monthly_1901-2023_mean_historical_cru_ts4.08_mean/global_countries?_format=json';
-    try {
-        const response = await fetch(endpoint);
-        if (!response.ok) throw new Error('Climate fetch failed');
-        
-        // 🌟 Fix: The JSON response from this World Bank API endpoint is a single array.
-        const data = await response.json(); 
-        
-        climateDataCache = data;
-        return climateDataCache;
-    } catch (err) { console.error(err); return null; }
-}
-
-// Find country in climate data
-function findCountryData(climateData, countryName) {
-    // 🌟 Fix: climateData IS the array here (from the API response), so .find is correct.
-    // Ensure the country matching is robust, ignoring case.
-    return climateData.find(c => c.country.toLowerCase() === countryName.toLowerCase());
-}
-
-// Render charts with yearly aggregated data
-function renderCharts(countryData) {
-    if (!countryData) return;
-
-    const years = Array.from({ length: countryData.tas.length / 12 }, (_, i) => 1901 + i);
-    const tempValues = monthlyToYearlyAvg(countryData.tas);
-    const prValues = monthlyToYearlyAvg(countryData.pr);
-    
-    // --- CHART DESTRUCTION AND REDRAW ---
-
-    // Temperature chart
-    if (tempChart) tempChart.destroy();
-    tempChart = new Chart(document.getElementById('chart-temp').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: years,
-            datasets: [{
-                label: `${countryData.country} Avg Temp (°C)`,
-                data: tempValues,
-                borderColor: '#FF5733',
-                backgroundColor: 'rgba(255,87,51,0.1)',
-                fill: true,
-                tension: 0.3
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    // Precipitation chart
-    if (seaChart) seaChart.destroy();
-    seaChart = new Chart(document.getElementById('chart-sea').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: years,
-            datasets: [{
-                label: `${countryData.country} Precipitation (mm)`,
-                data: prValues,
-                borderColor: '#33A0FF',
-                backgroundColor: 'rgba(51,160,255,0.1)',
-                fill: true
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    // CO2 chart (derived)
-    if (co2Chart) co2Chart.destroy();
-    co2Chart = new Chart(document.getElementById('chart-co2').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: years,
-            datasets: [{
-                label: 'CO₂ (ppm)',
-                data: tempValues.map(v => v * 0.1 + 370), // Simplified derivation
-                borderColor: '#8A2BE2',
-                backgroundColor: 'rgba(138,43,226,0.1)',
-                fill: true
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    // Custom chart (derived)
-    if (customChart) customChart.destroy();
-    customChart = new Chart(document.getElementById('chart-custom').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: years,
-            datasets: [{
-                label: 'Regional Metric',
-                data: tempValues.map(v => v * 10), // Simplified derivation
-                backgroundColor: '#4CAF50'
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-}
-
-// Get key metrics for AI prompt
-function getAiMetrics(tempValues) {
-    if (!tempValues || tempValues.length < 2) return { currentAvgTemp: null, tempAnomaly: null };
-
-    // Current Temp: Average of the last 5 years
-    const recentAvg = tempValues.slice(-5).filter(v => v !== null).reduce((sum, v) => sum + v, 0) / 5;
-
-    // Baseline Temp: Average of the first 30 years (1901-1930) for pre-industrial comparison
-    const baselineAvg = tempValues.slice(0, 30).filter(v => v !== null).reduce((sum, v) => sum + v, 0) / 30;
-    
-    const anomaly = recentAvg - baselineAvg;
-
-    return {
-        currentAvgTemp: recentAvg ? recentAvg.toFixed(2) : null,
-        tempAnomaly: anomaly ? anomaly.toFixed(2) : null,
-        seaLevelRise: 3.5 // Still hardcoded, but based on real data now
-    };
-}
-
-// Handle search
+// Function to handle the search action and update the map (No changes needed here)
 async function handleSearch() {
-    const location = document.getElementById('location-search').value.trim();
+    const searchInput = document.getElementById('location-search');
+    const location = searchInput.value.trim();
     const searchButton = document.getElementById('search-button');
-    if (!location) return alert('Please enter a location');
+
+    if (!location) {
+        alert('Please enter a location to search.');
+        return;
+    }
 
     searchButton.textContent = 'Searching...';
     searchButton.disabled = true;
@@ -200,47 +157,48 @@ async function handleSearch() {
     searchButton.textContent = 'Search Impact';
     searchButton.disabled = false;
 
-    if (!coords) return alert(`Could not find location "${location}"`);
+    if (coords) {
+        console.log(`Location found: Lat ${coords.lat}, Lon ${coords.lon}`);
 
-    // Clear old markers
-    map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
+        // 2. Clear any existing markers (Map functionality)
+        map.eachLayer(function(layer) {
+            if (layer instanceof L.Marker) {
+                map.removeLayer(layer);
+            }
+        });
 
-    const marker = L.marker([coords.lat, coords.lon])
-        .addTo(map)
-        .bindPopup(`Impact Data for <b>${coords.country}</b>`).openPopup();
+        // 3. Add a marker to the new location
+        L.marker([coords.lat, coords.lon])
+            .addTo(map)
+            .bindPopup(`Impact Data for <b>${location}</b>`).openPopup();
+        
+        // 4. Update the map view
+        if (coords.bbox) {
+            map.fitBounds([
+                [coords.bbox[0], coords.bbox[2]], 
+                [coords.bbox[1], coords.bbox[3]]  
+            ], { padding: [50, 50], maxZoom: 10 }); 
+        } else {
+            map.setView([coords.lat, coords.lon], 10); 
+        }
 
-    if (coords.bbox) map.fitBounds([
-        [coords.bbox[0], coords.bbox[2]],
-        [coords.bbox[1], coords.bbox[3]]
-    ], { padding: [50,50], maxZoom: 10 });
-    else map.setView([coords.lat, coords.lon], 5);
+        // 5. TODO: Fetch detailed climate data and update the charts below!
+        // You will create this function next.
+        // updateCharts(coords.lat, coords.lon); 
 
-    const climateData = await fetchClimateData();
-    if (!climateData) return alert('Failed to fetch climate data');
-
-    const countryData = findCountryData(climateData, coords.country);
-    if (!countryData) {
-        marker.bindPopup(`No climate data for <b>${coords.country}</b>`).openPopup();
-        return;
+    } else {
+        alert(`Could not find a location for "${location}". Please try another search term.`);
     }
-    
-    // 1. Render charts
-    renderCharts(countryData);
-    
-    // 2. Prepare data for AI
-    const tempValues = monthlyToYearlyAvg(countryData.tas);
-    const aiMetrics = getAiMetrics(tempValues);
-
-    // 3. Generate AI Analysis (Imported from text_gen.js)
-    const metaPrompt = buildClimatePrompt(coords.country, coords.lat, coords.lon, aiMetrics);
-    fetchAiAnalysis(metaPrompt);
 }
 
-// Event listeners
+// Attach event listeners
 document.getElementById('search-button').addEventListener('click', handleSearch);
-document.getElementById('location-search').addEventListener('keypress', e => {
-    if (e.key === 'Enter') { e.preventDefault(); handleSearch(); }
+document.getElementById('location-search').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        handleSearch();
+    }
 });
 
-// Initialize
+// Run the initialization when the page is fully loaded
 window.onload = initializeDashboard;
