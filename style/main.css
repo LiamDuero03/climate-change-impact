@@ -1,172 +1,38 @@
-/* General Reset and Base Styles */
+/* General Reset - Good to keep this minimal, universal reset */
 * {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+    /* Removed margin/padding reset as Tailwind's Preflight handles this */
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #121212; /* Dark background for a modern dashboard feel */
-    color: #e0e0e0; /* Light text for contrast */
-    line-height: 1.6;
+/* Ensure the Leaflet map container initializes correctly */
+.leaflet-container {
+    /* This rule is crucial for Leaflet to display properly */
+    background-color: transparent; 
 }
 
-h1, h2, h3 {
-    color: #4CAF50; /* A pop of green for climate/sustainability theme */
-    margin-bottom: 0.5em;
-}
-
-/* --- Header Section --- */
-.dashboard-header {
-    background-color: #1e1e1e;
-    padding: 2rem 5%;
-    text-align: center;
-    border-bottom: 3px solid #4CAF50;
-}
-
-.dashboard-header h1 {
-    font-size: 2.5em;
-    margin-bottom: 0.2em;
-}
-
-/* Search Bar Styling */
-.search-container {
-    margin-top: 1.5rem;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
-#location-search {
-    padding: 0.75rem 1rem;
-    width: 60%;
-    max-width: 400px;
-    border: 2px solid #333;
-    border-radius: 5px;
-    background-color: #2c2c2c;
-    color: #e0e0e0;
-    font-size: 1em;
-    transition: border-color 0.3s;
-}
-
-#location-search:focus {
-    outline: none;
-    border-color: #4CAF50;
-}
-
-#search-button {
-    padding: 0.75rem 1.5rem;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    transition: background-color 0.3s;
-}
-
-#search-button:hover {
-    background-color: #66BB6A;
-}
-
-
-/* --- Main Content and Sections --- */
-.dashboard-main {
-    padding: 2rem 5%;
-    max-width: 1400px; /* Constrain width for better reading */
-    margin: 0 auto;
-}
-
-.map-section, .graphs-section {
-    margin-bottom: 3rem;
-}
-
-/* Interactive Map Styling */
-.map-container {
-    height: 500px; /* Define a visible height for the map */
-    width: 100%;
-    background-color: #333; /* Placeholder color before map loads */
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-    overflow: hidden; /* Important for map libraries */
-}
-
-.map-caption {
-    text-align: center;
-    margin-top: 1rem;
-    font-style: italic;
-    color: #A9A9A9;
-}
-
-/* --- Graphs Section Styling --- */
-.graphs-grid {
-    display: grid;
-    /* Create a responsive grid: 2 columns on large screens, 1 on small */
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.graph-box {
-    background-color: #1e1e1e;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
-    transition: transform 0.3s;
-    min-height: 300px;
-}
+/* Custom Styling for the Graph Boxes */
+/* We keep the class .graph-box and its hover effect */
+/* NOTE: The lift effect (transform: translateY) is already on the HTML element 
+   with Tailwind's 'hover:scale-[1.02]'. This custom hover is optional/redundant 
+   unless you want a very specific effect here. */
 
 .graph-box:hover {
-    transform: translateY(-5px); /* Subtle lift effect */
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+    /* Use this to add a subtle shadow specific to the custom class */
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); /* Subtle green glow on hover */
 }
 
-.graph-box h3 {
-    border-bottom: 1px solid #333;
-    padding-bottom: 0.5rem;
-    margin-top: 0;
-    font-size: 1.2em;
-}
-
-/* --- Footer --- */
-.dashboard-footer {
-    background-color: #1e1e1e;
-    text-align: center;
-    padding: 1rem 5%;
-    border-top: 1px solid #333;
-    font-size: 0.9em;
-    color: #A9A9A9;
-}
-
-/* Horizontal Rule Styling */
-hr {
+/* Highly Custom: Horizontal Rule Styling */
+/* This gradient is difficult to achieve purely with Tailwind utilities, so we keep it. */
+hr.border-gray-700 { /* Targeting the specific hr class from the HTML */
     border: 0;
     height: 1px;
+    /* Create a gradient effect for the divider line */
     background-image: linear-gradient(to right, rgba(255, 255, 255, 0), #4CAF50, rgba(255, 255, 255, 0));
-    margin: 2rem 0;
 }
 
-/* --- Responsiveness --- */
-@media (max-width: 768px) {
-    .dashboard-header {
-        padding: 1.5rem 5%;
-    }
-    
-    .dashboard-header h1 {
-        font-size: 2em;
-    }
-
-    .search-container {
-        flex-direction: column;
-        align-items: center;
-    }
-
-    #location-search, #search-button {
-        width: 100%;
-        max-width: 300px;
-    }
-
-    .dashboard-main {
-        padding: 1.5rem 5%;
-    }
-}
+/*
+--- REMOVED STYLES ---
+- General body/h1/h2/h3 styles: These are handled by Tailwind's bg-dark-bg, text-light-text, and text-primary classes on the body/elements.
+- All .dashboard-header, .search-container, #location-search, #search-button styles: These are fully managed by Tailwind utility classes in the HTML.
+- Layouts like .dashboard-main, .graphs-grid: These are managed by max-w-7xl, mx-auto, and the grid utility classes in the HTML.
+*/
