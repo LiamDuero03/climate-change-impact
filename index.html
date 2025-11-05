@@ -72,10 +72,10 @@
 
             <section>
                 <h2 class="text-3xl font-bold text-primary mb-6 border-b border-gray-700 pb-2">Detailed Data Visualizations</h2>
-                
-                <!-- Updated charts grid -->
-                <div class="charts-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    
+    
+                <!-- Updated charts grid: 1 column on mobile, 2 columns on md and larger -->
+                <div class="charts-grid grid grid-cols-1 md:grid-cols-2 gap-6">
+        
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-temp-anomaly">
                         <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Temperature Anomaly</h3>
                         <canvas id="chart-temp" class="w-full h-[24rem]"></canvas>
@@ -99,6 +99,7 @@
 
                 </div>
             </section>
+
 
         </main>
 
