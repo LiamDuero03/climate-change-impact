@@ -5,7 +5,6 @@ let map;
 let tempChart, seaChart, co2Chart, customChart;
 let climateData = []; 
 
-import Papa from 'papaparse';
 
 function initializeDashboard() {
     console.log("Dashboard initialized. Loading map and charts...");
