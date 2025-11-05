@@ -7,7 +7,7 @@ let tempData = [];
 let precipData = [];
 
 // ----------------------------
-// Initialize dashboard & charts
+// Initialize dashboard & charts (UNCHANGED)
 // ----------------------------
 function initializeDashboard() {
     console.log("Dashboard initialized. Loading map and charts...");
@@ -19,9 +19,7 @@ function initializeDashboard() {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    // 2. Chart Initialization (Chart IDs must match HTML)
-
-    // Temperature chart
+    // 2. Chart Initialization 
     const tempCtx = document.getElementById('chart-temp');
     if (tempCtx) { 
         tempChart = new Chart(tempCtx, {
@@ -34,7 +32,6 @@ function initializeDashboard() {
         });
     }
 
-    // Precipitation chart (Assumed HTML ID is 'chart-precip', not 'chart-sea')
     const precipCtx = document.getElementById('chart-precip'); 
     if (precipCtx) { 
         precipChart = new Chart(precipCtx, {
@@ -47,11 +44,7 @@ function initializeDashboard() {
         });
     }
     
-    // NOTE: You need to add co2Chart and customChart initializations here or ensure your HTML has placeholders for them
-    // Otherwise, subsequent code trying to update them will throw errors.
-
     // 3. Load CSV data (Papa Parse)
-    // Load temperature CSV
     Papa.parse('./data/tidy-temperature.csv', {
         download: true,
         header: true,
@@ -63,7 +56,6 @@ function initializeDashboard() {
         }
     });
 
-    // Load precipitation CSV
     Papa.parse('./data/tidy-percipitation.csv', {
         download: true,
         header: true,
@@ -77,7 +69,7 @@ function initializeDashboard() {
 }
 
 // ----------------------------
-// Helpers for country & global data
+// Helpers for country & global data (ADDED NEW HELPER)
 // ----------------------------
 function normalizeCountry(name) {
     if (!name || typeof name !== 'string') {
@@ -105,6 +97,27 @@ function getCountryData(dataset, searchName) {
     };
 }
 
+/**
+ * 🌟 NEW HELPER: Finds the latest data point for a given metric/country.
+ * @param {Array} dataset - The tempData or precipData array.
+ * @param {string} countryName - The normalized country name.
+ * @returns {object} { year, value }
+ */
+function getLatestMetric(dataset, countryName) {
+    const data = getCountryData(dataset, countryName);
+    if (data.labels.length === 0) {
+        return { year: 'N/A', value: 'N/A' };
+    }
+    
+    // The data is already sorted by year in getCountryData, so the last element is the latest.
+    const latestIndex = data.labels.length - 1;
+    return {
+        year: data.labels[latestIndex],
+        value: parseFloat(data.values[latestIndex]).toFixed(2)
+    };
+}
+
+
 function getGlobalData(dataset) {
     const validDataset = dataset.filter(d => d.year && d.value !== null && d.value !== undefined);
 
@@ -120,7 +133,7 @@ function getGlobalData(dataset) {
 }
 
 // ----------------------------
-// Update charts
+// Update charts (UNCHANGED)
 // ----------------------------
 function updateGlobalCharts() {
     if (!tempChart || !precipChart) return; 
@@ -146,25 +159,25 @@ function updateCountryCharts(countryName) {
     const tempCountry = getCountryData(tempData, countryName);
     const precipCountry = getCountryData(precipData, countryName);
 
+    // Temperature
     if(tempCountry.labels.length>0) {
         tempChart.data.labels = tempCountry.labels;
         tempChart.data.datasets[0].data = tempCountry.values;
         tempChart.data.datasets[0].label = `${countryName} Temperature (°C)`;
         tempChart.update();
     } else {
-        console.warn(`No temperature data found for ${countryName}.`);
-        // If no country data found, revert to global data view for temperature
+        console.warn(`No temperature data found for ${countryName}. Reverting to global view.`);
         updateGlobalCharts();
     }
 
+    // Precipitation
     if(precipCountry.labels.length>0) {
         precipChart.data.labels = precipCountry.labels;
         precipChart.data.datasets[0].data = precipCountry.values;
         precipChart.data.datasets[0].label = `${countryName} Precipitation (mm)`;
         precipChart.update();
     } else {
-        console.warn(`No precipitation data found for ${countryName}.`);
-        // If no country data found, revert to global data view for precipitation
+        console.warn(`No precipitation data found for ${countryName}. Reverting to global view.`);
         updateGlobalCharts();
     }
 }
@@ -181,20 +194,16 @@ async function geocodeLocation(location) {
         if(data.length > 0){
             const r = data[0];
             
-            // 🌟 FIX: Extract Country Name from display_name (usually the last element)
             const nameParts = r.display_name.split(',').map(s=>s.trim());
-            // This attempts to find the country name by taking the last part of the address string.
-            // e.g., "London, England, United Kingdom" -> "United Kingdom"
             const country = nameParts.slice(-1)[0]; 
 
-            // Use the full name for the map marker popup
             const displayLocation = nameParts.length > 1 ? nameParts[0] + ', ' + nameParts.slice(-1)[0] : nameParts[0]; 
 
             return { 
                 lat: parseFloat(r.lat), 
                 lon: parseFloat(r.lon), 
-                locationName: displayLocation, // City name for display
-                countryName: country,         // 🌟 NEW: Country name for chart lookup
+                locationName: displayLocation, 
+                countryName: country,         
                 bbox: r.boundingbox.map(Number) 
             };
         }
@@ -223,15 +232,30 @@ async function handleSearch() {
     searchButton.disabled = false;
 
     if(coords){
+        const chartLookupName = coords.countryName;
+        
+        // 🌟 NEW: Get the latest metrics for display
+        const latestTemp = getLatestMetric(tempData, chartLookupName);
+        const latestPrecip = getLatestMetric(precipData, chartLookupName);
+
+        // 🌟 NEW: Build the popup content with inline metrics
+        let popupContent = `
+            <b>${coords.locationName}</b>
+            <hr style="margin: 4px 0;">
+            <p>🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b></p>
+            <p>💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b></p>
+        `;
+
         // Map updates
         map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
-        L.marker([coords.lat, coords.lon]).addTo(map)
-            .bindPopup(`Impact Data for <b>${coords.locationName}</b>`).openPopup();
+        L.marker([coords.lat, coords.lon])
+            .addTo(map)
+            .bindPopup(popupContent).openPopup(); // Use the rich content here
+        
         if(coords.bbox) map.fitBounds([[coords.bbox[0], coords.bbox[2]],[coords.bbox[1], coords.bbox[3]]], {padding:[50,50], maxZoom:10});
         else map.setView([coords.lat, coords.lon], 10);
 
-        // 🌟 FIX: Use the extracted countryName for chart lookup
-        const chartLookupName = coords.countryName;
+        // Update charts with country data
         updateCountryCharts(chartLookupName);
 
         // AI analysis (optional)
@@ -240,7 +264,6 @@ async function handleSearch() {
             tempAnomaly: (Math.random()*0.5+0.8).toFixed(2),
             seaLevelRise: (Math.random()*1+3).toFixed(1)
         };
-        // Use the country name for the AI prompt
         fetchAiAnalysis(buildClimatePrompt(chartLookupName, coords.lat.toFixed(4), coords.lon.toFixed(4), mockClimateData));
 
     } else {
@@ -250,10 +273,9 @@ async function handleSearch() {
 }
 
 // ----------------------------
-// Event listeners & initialization
+// Event listeners & initialization (UNCHANGED)
 // ----------------------------
 document.getElementById('search-button').addEventListener('click', handleSearch);
 document.getElementById('location-search').addEventListener('keypress', e => { if(e.key==='Enter'){ e.preventDefault(); handleSearch(); } });
 
-// Ensure all scripts (Leaflet, Chart.js, Papa Parse) are loaded before running JS logic.
 window.onload = initializeDashboard;
