@@ -6,10 +6,11 @@ import { buildClimatePrompt, fetchAiAnalysis } from './text_gen.js';
 let map; 
 // 🌟 MODIFICATION: Removed customChart as it will display text, not a chart canvas
 let tempChart, precipChart, rainChart, co2Chart; 
-let tempData = [];
+// NOTE: tempData is now forecastData based on the CSV name provided in initializeDashboard
+let forecastData = []; 
 let precipData = [];
-let rainData = []; // Correctly declared globally
-let countryLayer = null; // 🌟 NEW: Global variable to store the current country highlight layer
+let rainData = []; 
+let countryLayer = null; 
 
 // ----------------------------
 // Initialize dashboard & charts
@@ -73,10 +74,7 @@ function initializeDashboard() {
         });
     }
     
-    // NOTE: Initialization for chart-custom is removed here.
-    
     // 3. Load CSV data (Papa Parse) 
-    // 🌟 OPTIMIZATION: Only call updateGlobalCharts() once after all data is loaded.
     let loadedCount = 0;
     const expectedLoads = 3;
 
@@ -102,8 +100,9 @@ function initializeDashboard() {
         header: true,
         dynamicTyping: true,
         complete: function(results) {
-            tempData = results.data.filter(row => row.name && row.value !== null);
-            console.log("Temperature CSV loaded:", tempData.length, "rows");
+            // 🌟 MODIFICATION: Storing in 'forecastData'
+            forecastData = results.data.filter(row => row.name && row.value !== null);
+            console.log("Temperature/Forecast CSV loaded:", forecastData.length, "rows");
             checkAndInitializeCharts();
         }
     });
@@ -154,7 +153,7 @@ function loadCountryBorders() {
 }
 
 // ----------------------------
-// Helpers for country & global data (UNCHANGED)
+// Helpers for country & global data
 // ----------------------------
 function normalizeCountry(name) {
     if (!name || typeof name !== 'string') {
@@ -183,6 +182,7 @@ function getCountryData(dataset, searchName) {
 }
 
 function getLatestMetric(dataset, countryName) {
+    // NOTE: This now uses 'forecastData' for temperature to ensure consistency
     const data = getCountryData(dataset, countryName);
     if (data.labels.length === 0) {
         return { year: 'N/A', value: 'N/A' };
@@ -193,6 +193,27 @@ function getLatestMetric(dataset, countryName) {
         year: data.labels[latestIndex],
         value: parseFloat(data.values[latestIndex]).toFixed(2)
     };
+}
+
+// 🌟 NEW HELPER: Get a specific metric for a given year (e.g., 2023 temperature, 2030 forecast)
+function getMetricForYear(dataset, countryName, targetYear) {
+    const normSearch = normalizeCountry(countryName); 
+    
+    if (normSearch === "") {
+        return { year: targetYear, value: 'N/A' };
+    }
+    
+    const row = dataset.find(d => 
+        d.name && d.year && normalizeCountry(d.name) === normSearch && new Date(d.year).getFullYear() === targetYear
+    );
+    
+    if (row && row.value !== null) {
+        return {
+            year: targetYear,
+            value: parseFloat(row.value).toFixed(2)
+        };
+    }
+    return { year: targetYear, value: 'N/A' };
 }
 
 function getGlobalData(dataset) {
@@ -210,7 +231,8 @@ function getGlobalData(dataset) {
 }
 
 function determinePrimaryRisk(countryName) {
-    const tempHistorical = getCountryData(tempData, countryName).values.map(Number);
+    // 🌟 MODIFICATION: Using forecastData for temperature trend calculation
+    const tempHistorical = getCountryData(forecastData, countryName).values.map(Number);
     const precipHistorical = getCountryData(precipData, countryName).values.map(Number);
 
     if (tempHistorical.length < 35 || precipHistorical.length < 35) {
@@ -288,8 +310,8 @@ function getRiskColor(magnitude) {
 function updateGlobalCharts() {
     if (!tempChart || !precipChart || !rainChart) return; 
 
-    // Temperature
-    const tempGlobal = getGlobalData(tempData);
+    // Temperature (using forecastData for consistency)
+    const tempGlobal = getGlobalData(forecastData);
     tempChart.data.labels = tempGlobal.labels;
     tempChart.data.datasets[0].data = tempGlobal.values;
     tempChart.data.datasets[0].label = "Global Avg Temperature (°C)";
@@ -313,7 +335,8 @@ function updateGlobalCharts() {
 function updateCountryCharts(countryName) {
     if (!tempChart || !precipChart || !rainChart) return; 
     
-    const tempCountry = getCountryData(tempData, countryName);
+    // 🌟 MODIFICATION: Using forecastData
+    const tempCountry = getCountryData(forecastData, countryName);
     const precipCountry = getCountryData(precipData, countryName);
     const rainCountry = getCountryData(rainData, countryName); 
     
@@ -467,17 +490,24 @@ function highlightCountryLayer(countryName, riskMagnitude, coords) {
 
 /**
  * 🌟 MODIFIED: Consolidated function to update the map, charts, and AI analysis.
- * Now injects risk assessment into the custom panel div.
+ * Now specifically uses 2023 for current temperature.
  */
 async function updateDashboard(lat, lon, countryName, locationName, bbox = null) {
     const chartLookupName = countryName;
     
     // 1. Get metrics and risk assessment
-    const latestTemp = getLatestMetric(tempData, chartLookupName);
+    // 🌟 MODIFICATION: Explicitly get 2023 temperature (Current Temp)
+    const temp2023 = getMetricForYear(forecastData, chartLookupName, 2023); 
+    
+    // Precipitation and Rain Days use the latest available metric (likely also 2023/2024 from data sets)
     const latestPrecip = getLatestMetric(precipData, chartLookupName);
-    const riskAssessment = determinePrimaryRisk(chartLookupName); 
     const latestRain = getLatestMetric(rainData, chartLookupName);
+    
+    const riskAssessment = determinePrimaryRisk(chartLookupName); 
     const riskColor = getRiskColor(riskAssessment.magnitude);
+    
+    // 🌟 NEW: Get 2030 Temperature Prediction
+    const temp2030 = getMetricForYear(forecastData, chartLookupName, 2030); // Reusing getMetricForYear
 
     // 2. Apply risk color coding & get marker style
     const markerIcon = highlightCountryLayer(countryName, riskAssessment.magnitude, { bbox: bbox });
@@ -490,7 +520,8 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
             <hr style="margin: 4px 0; border-color: #333;">
             <p class="text-sm text-gray-400">Data Source: ${countryName}</p>
             <div class="flex flex-col gap-2 mt-3 text-base">
-                <p>🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b></p> 
+                <p>🌡️ Current Temp (${temp2023.year}): <b>${temp2023.value}°C</b></p> 
+                <p class="text-yellow-400">🔥 Predicted Temp (${temp2030.year}): <b>${temp2030.value}°C</b></p>
                 <p>💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b></p>
                 <p>⛈️ Extreme Rain Days (${latestRain.year}): <b>${latestRain.value} days</b></p>
             </div>
@@ -516,8 +547,8 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
         <hr style="margin: 4px 0;">
         <p>Data Source: ${countryName}</p>
         <p style="margin-bottom: 8px;">
-            🌡️ Temp (${latestTemp.year}): <b>${latestTemp.value}°C</b> | 
-            💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b>
+            🌡️ Current Temp (${temp2023.year}): <b>${temp2023.value}°C</b> | 
+            🔥 2030 Forecast: <b>${temp2030.value}°C</b>
         </p>
         <p style="font-weight: bold; color: ${riskColor};">
             Risk: ${riskAssessment.magnitude}
@@ -536,7 +567,6 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
         .bindPopup(popupContent); 
     
     // If GeoJSON highlight was successful, it will already have fit the bounds. 
-    // Only fall back to BBOX fit if the bounding box is present and no GeoJSON fit was performed.
     if(bbox && !countryLayer) {
         map.fitBounds([[bbox[0], bbox[2]],[bbox[1], bbox[3]]], {padding:[50,50], maxZoom:10});
     } else if (!countryLayer) {
@@ -557,7 +587,7 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
 
     // 7. AI analysis 
     const aiClimateData = {
-        currentAvgTemp: latestTemp.value,
+        currentAvgTemp: temp2023.value, // 🌟 IMPORTANT: Use the 2023 value for AI prompt
         tempAnomaly: riskAssessment.tempAnomaly,
         seaLevelRise: (Math.random()*1+3).toFixed(1), 
         primaryRisk: riskAssessment.primaryRisk,

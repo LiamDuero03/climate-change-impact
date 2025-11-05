@@ -4,10 +4,13 @@
  */
 
 // 🌟 FIX: Use process.env for secure API key access, as discussed.
+// NOTE: These variables are retained but the API call logic is short-circuited below.
 const OPENROUTER_API_KEY = ""; 
 const AI_MODEL = "moonshotai/kimi-k2:free";
 const API_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
+// 🌟 NEW CONSTANT: Flag to control AI activation
+const IS_AI_ACTIVATED_FOR_DEPLOYMENT = false; // Set to true to reactivate AI calls
 
 /**
  * Function to build the meta-prompt using all calculated climate data.
@@ -23,21 +26,27 @@ export function buildClimatePrompt(location, lat, lon, data = {}) {
     const riskMagnitude = data.magnitude || 'Medium';
     const precipChange = data.precipChange || '0.0'; 
 
-    const metaPrompt = `
-        You are a climate change communication expert. Your task is to provide a concise, engaging, 
-        and impactful summary of the climate change situation for the location "${location}" (Latitude: ${lat}, Longitude: ${lon}). 
-        
-        Use the following data points to inform your summary:
-        - Current Average Annual Temperature: ${currentAvgTemp}°C
-        - Temperature Anomaly (rise since pre-industrial baseline): +${tempAnomaly}°C
-        - Precipitation Change (since baseline): ${precipChange}%
-        - Primary Climate Risk: ${primaryRisk} (${riskMagnitude} magnitude)
-        
-        Write a 3-paragraph summary that includes:
-        1. A strong, current assessment of the **Primary Risk** (${primaryRisk}) and its potential local impacts (e.g., heatwaves, drought, flooding), referencing the magnitude (${riskMagnitude}).
-        2. A brief comparison of the current temperature anomaly to the 1.5°C global target, and contextualize the precipitation change.
-        3. A concluding positive statement about adaptation or mitigation efforts relevant to the primary risk.
-        Format the response using Markdown paragraphs.
+    const metaPrompt = `You are a climate change communication expert. Write a 3-paragraph Markdown summary about climate change in "${location}" (Lat: ${lat}, Lon: ${lon}).
+
+Use these data points:
+
+Avg Annual Temp: ${currentAvgTemp}°C
+
+Temp Anomaly: +${tempAnomaly}°C
+
+Precipitation Change: ${precipChange}%
+
+Primary Climate Risk: ${primaryRisk} (${riskMagnitude} magnitude)
+
+Your summary should:
+
+Explain the primary risk (${primaryRisk}) and its local impacts, mentioning its magnitude.
+
+Compare the temperature anomaly to the 1.5°C global target and interpret the precipitation change.
+
+End with a hopeful note about adaptation or mitigation related to the primary risk.
+
+Keep the tone engaging, clear, and relatable — avoid jargon and excessive numbers.
     `;
     return metaPrompt;
 }
@@ -45,10 +54,30 @@ export function buildClimatePrompt(location, lat, lon, data = {}) {
 // Function to make the actual LLM API call to OpenRouter and display the result
 export async function fetchAiAnalysis(prompt) {
     const aiTextContent = document.getElementById('ai-text-content');
+    
+    // =============================================================
+    // 🛑 DEPLOYMENT DEACTIVATION GUARD RAIL
+    // =============================================================
+    if (!IS_AI_ACTIVATED_FOR_DEPLOYMENT) {
+        aiTextContent.innerHTML = `
+            <p class="text-yellow-400 font-bold">
+                ⚠️ AI Analysis Deactivated (Deployment Mode)
+            </p>
+            <p class="text-gray-400 mt-2">
+                The AI climate summary generation is currently deactivated for deployment purposes to conserve API resources. 
+                <br>Local climate metrics and risk assessment are still available below.
+            </p>
+        `;
+        aiTextContent.classList.remove('italic');
+        console.warn("AI Analysis skipped: Deactivated for deployment.");
+        return;
+    }
+    // =============================================================
+
     aiTextContent.innerHTML = '<span class="text-primary animate-pulse">🤖 Generating AI Analysis via Kimi-K2...</span>';
     aiTextContent.classList.add('italic');
     
-    // Check for API Key
+    // Check for API Key (will only run if IS_AI_ACTIVATED_FOR_DEPLOYMENT is true)
     if (!OPENROUTER_API_KEY) {
         aiTextContent.innerHTML = '<span class="text-red-500">❌ Error: API Key is missing. Set OPENROUTER_API_KEY in Vercel Secrets.</span>';
         aiTextContent.classList.remove('italic');
