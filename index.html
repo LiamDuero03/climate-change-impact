@@ -12,7 +12,7 @@
             theme: {
                 extend: {
                     colors: {
-                        'primary': '#4CAF50', // A climate-friendly green
+                        'primary': '#4CAF50',
                         'dark-bg': '#121212',
                         'card-bg': '#1e1e1e',
                         'light-text': '#e0e0e0',
@@ -22,20 +22,16 @@
         }
     </script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        crossorigin=""/>
-    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <link rel="stylesheet" href="styles/main.css">
 </head>
 
 <body class="bg-dark-bg text-light-text min-h-screen">
 
     <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        
+
         <header class="bg-card-bg rounded-xl shadow-2xl p-6 mb-8 border-b-4 border-primary text-center">
-            <h1 class="text-4xl sm:text-5xl font-extrabold text-primary mb-2">
-                🌍 Climate Impact Explorer
-            </h1>
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-primary mb-2">🌍 Climate Impact Explorer</h1>
             <p class="text-xl text-gray-400">Visualizing the effects of a changing climate worldwide.</p>
             
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mt-6">
@@ -55,54 +51,52 @@
         </header>
 
         <main>
-            
+
             <section class="mb-12">
                 <h2 class="text-3xl font-bold text-primary mb-4 border-b border-gray-700 pb-2">Interactive Impact Map</h2>
                 
-                <div id="impact-map" class="h-[500px] w-full bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-                </div>
+                <div id="impact-map" class="h-[500px] w-full bg-gray-800 rounded-xl shadow-xl overflow-hidden"></div>
                 <p class="mt-3 text-center text-gray-400 italic">Click on a region or use the search bar to explore detailed data.</p>
             </section>
 
             <hr class="border-gray-700 my-10">
-            
+
             <section class="ai-analysis-section mb-12">
-                <h2 class="text-3xl font-bold text-white mb-4 border-b border-gray-700 pb-2">
-                    🤖 AI Climate Situation Analysis
-                </h2>
+                <h2 class="text-3xl font-bold text-white mb-4 border-b border-gray-700 pb-2">🤖 AI Climate Situation Analysis</h2>
                 <div id="ai-response-box" class="bg-card-bg p-6 rounded-xl shadow-2xl min-h-[150px]">
                     <p id="ai-text-content" class="text-gray-300 italic">
                         Search for a location to generate a localized climate change summary powered by AI.
                     </p>
                 </div>
             </section>
-            
+
             <section>
                 <h2 class="text-3xl font-bold text-primary mb-6 border-b border-gray-700 pb-2">Detailed Data Visualizations</h2>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Updated charts grid -->
+                <div class="charts-grid grid grid-cols-1 gap-6 lg:grid-cols-2">
                     
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-temp-anomaly">
                         <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Temperature Anomaly</h3>
-                        <canvas id="chart-temp" class="h-64"></canvas>
+                        <canvas id="chart-temp" class="w-full h-[24rem]"></canvas>
                     </div>
 
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-sea-level">
                         <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Sea Level Change</h3>
-                        <canvas id="chart-sea" class="h-64"></canvas>
+                        <canvas id="chart-sea" class="w-full h-[24rem]"></canvas>
                     </div>
 
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-co2">
-                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Atmospheric $\text{CO}_2$</h3>
-                        <canvas id="chart-co2" class="h-64"></canvas>
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Atmospheric CO₂</h3>
+                        <canvas id="chart-co2" class="w-full h-[24rem]"></canvas>
                     </div>
 
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-custom">
                         <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Regional Metric</h3>
-                        <canvas id="chart-custom" class="h-64"></canvas>
+                        <canvas id="chart-custom" class="w-full h-[24rem]"></canvas>
                         <p class="text-gray-500 text-sm mt-2">Data will load here after search...</p>
                     </div>
-                    
+
                 </div>
             </section>
 
@@ -114,9 +108,7 @@
 
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        crossorigin=""></script>
-    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script type="module" src="scripts/text_gen.js"></script>

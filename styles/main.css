@@ -18,19 +18,21 @@
    Graph Boxes
 -------------------------------- */
 .graph-box {
-    /* Ensure chart containers have a fixed height */
-    height: 16rem; /* Tailwind h-64 equivalent */
+    /* Taller for better readability */
+    height: 24rem; /* ~h-96 equivalent */
     display: flex;
     flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .graph-box canvas {
-    flex: 1; /* Canvas fills the available height of the parent */
+    flex: 1;               /* Canvas fills the available height */
     width: 100% !important;
     height: 100% !important;
 }
 
 .graph-box:hover {
+    transform: scale(1.02);
     box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); /* Subtle green glow */
 }
 
@@ -55,14 +57,19 @@ hr.border-gray-700 {
 }
 
 /* -------------------------------
-   Optional: Smooth Chart Hover Scaling
+   Grid Layout for Charts (Stacked)
 -------------------------------- */
-.graph-box {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* Single column by default */
+    gap: 1.5rem;
 }
 
-.graph-box:hover {
-    transform: scale(1.02); /* Slight lift without breaking layout */
+@media (min-width: 1024px) {
+    /* Two columns on large screens */
+    .charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 /* -------------------------------
