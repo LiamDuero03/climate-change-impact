@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Climate Impact Dashboard</title>
@@ -82,8 +83,8 @@
                     </div>
 
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-sea-level">
-                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Sea Level Change</h3>
-                        <canvas id="chart-sea" class="w-full h-[24rem]"></canvas>
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Percepition Rate</h3>
+                        <canvas id="chart-precip" class="w-full h-[24rem]"></canvas>
                     </div>
 
                     <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-co2">
@@ -111,7 +112,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+   
     <script type="module" src="scripts/text_gen.js"></script>
     <script type="module" src="scripts/main.js"></script>
 
