@@ -97,7 +97,7 @@ function initializeDashboard() {
         }
     };
     
-    Papa.parse('./data/tidy-temperature.csv', {
+    Papa.parse('./data/tidy-forecast.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
