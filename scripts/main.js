@@ -1,3 +1,5 @@
+// 🌟 NEW: Global variable to store the GeoJSON feature group
+let countriesGeoJson = null; 
 // 🌟 FIX 1: Import AI analysis functions from the module file
 import { buildClimatePrompt, fetchAiAnalysis } from './text_gen.js'; 
 
@@ -5,9 +7,10 @@ let map;
 let tempChart, precipChart, co2Chart, customChart; 
 let tempData = [];
 let precipData = [];
+let countryLayer = null; // 🌟 NEW: Global variable to store the current country highlight layer
 
 // ----------------------------
-// Initialize dashboard & charts (UNCHANGED)
+// Initialize dashboard & charts
 // ----------------------------
 function initializeDashboard() {
     console.log("Dashboard initialized. Loading map and charts...");
@@ -19,10 +22,14 @@ function initializeDashboard() {
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
+    // 🌟 NEW: Load country borders GeoJSON
+    loadCountryBorders();
+
     // 🌟 NEW: Attach click handler to the map
     map.on('click', handleMapClick); 
 
-    // 2. Chart Initialization 
+    // ... (rest of initializeDashboard remains the same) ...
+    // 2. Chart Initialization (UNCHANGED)
     const tempCtx = document.getElementById('chart-temp');
     if (tempCtx) { 
         tempChart = new Chart(tempCtx, {
@@ -47,7 +54,7 @@ function initializeDashboard() {
         });
     }
     
-    // 3. Load CSV data (Papa Parse)
+    // 3. Load CSV data (Papa Parse) (UNCHANGED)
     Papa.parse('./data/tidy-temperature.csv', {
         download: true,
         header: true,
@@ -69,6 +76,28 @@ function initializeDashboard() {
             updateGlobalCharts();
         }
     });
+}
+
+// ----------------------------
+// 🌟 NEW FUNCTION: Load GeoJSON Country Borders
+// ----------------------------
+function loadCountryBorders() {
+    // Assuming you have a 'countries.geojson' file in your data folder
+    fetch('./data/countries.geojson') 
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Store the GeoJSON data globally
+            countriesGeoJson = data; 
+            console.log("GeoJSON country borders loaded.");
+        })
+        .catch(error => {
+            console.error("Error loading GeoJSON data:", error);
+        });
 }
 
 // ----------------------------
@@ -185,6 +214,20 @@ function determinePrimaryRisk(countryName) {
     };
 }
 
+/**
+ * 🌟 NEW HELPER: Maps risk magnitude to a color code.
+ */
+function getRiskColor(magnitude) {
+    switch (magnitude) {
+        case 'High':
+            return '#FF5733'; // Red/Orange for High Risk
+        case 'Medium':
+            return '#FFC300'; // Yellow/Amber for Medium Risk
+        default:
+            return '#4CAF50'; // Green for Low/Monitor
+    }
+}
+
 
 // ----------------------------
 // Update charts (UNCHANGED)
@@ -257,7 +300,7 @@ async function geocodeLocation(location) {
                 lat: parseFloat(r.lat), 
                 lon: parseFloat(r.lon), 
                 locationName: displayLocation, 
-                countryName: country,         
+                countryName: country,      
                 bbox: r.boundingbox.map(Number) 
             };
         }
@@ -283,6 +326,75 @@ async function reverseGeocode(lat, lon) {
 }
 
 /**
+ * 🌟 MODIFIED HELPER: Handles highlighting the country using GeoJSON data.
+ */
+function highlightCountryLayer(countryName, riskMagnitude, coords) {
+    // 1. Remove any existing layer
+    if (countryLayer) {
+        map.removeLayer(countryLayer);
+        countryLayer = null;
+    }
+    
+    const riskColor = getRiskColor(riskMagnitude);
+
+    // 2. Highlight using GeoJSON feature
+    if (countriesGeoJson && countryName) {
+        // Normalize the country name for robust lookup
+        const normCountryName = normalizeCountry(countryName);
+
+        // Find the feature in the GeoJSON data
+        const feature = countriesGeoJson.features.find(f => {
+            // Adjust property name based on your GeoJSON file's structure (e.g., 'name', 'country', 'ADMIN')
+            // This assumes the GeoJSON property is 'name' and can be normalized
+            return f.properties.name && normalizeCountry(f.properties.name) === normCountryName;
+        });
+
+        if (feature) {
+            // Use Leaflet's GeoJSON layer to draw the precise boundary
+            countryLayer = L.geoJson(feature, {
+                style: {
+                    color: riskColor,
+                    weight: 3,
+                    opacity: 0.8,
+                    fillColor: riskColor,
+                    fillOpacity: 0.15,
+                    dashArray: '5, 5' 
+                }
+            }).addTo(map);
+            
+            // Optionally, zoom to the bounds of the country outline
+            if (countryLayer.getBounds) {
+                map.fitBounds(countryLayer.getBounds(), {padding:[20,20], maxZoom:10});
+            }
+        } else {
+            // Fallback to bounding box if GeoJSON boundary isn't found
+            console.warn(`GeoJSON boundary not found for ${countryName}. Falling back to BBOX highlight.`);
+            if (coords && coords.bbox) {
+                const bounds = [[coords.bbox[0], coords.bbox[2]], [coords.bbox[1], coords.bbox[3]]];
+                
+                countryLayer = L.rectangle(bounds, {
+                    color: riskColor,
+                    weight: 3,
+                    fillColor: riskColor,
+                    fillOpacity: 0.15,
+                    dashArray: '5, 5' 
+                }).addTo(map);
+            }
+        }
+    }
+    
+    // 3. Create a custom icon for the marker based on risk color (UNCHANGED)
+    const customIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${riskColor}; width: 15px; height: 15px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px ${riskColor};"></div>`,
+        iconSize: [15, 15],
+        iconAnchor: [7, 7]
+    });
+    
+    return customIcon;
+}
+
+/**
  * 🌟 NEW: Consolidated function to update the map, charts, and AI analysis.
  */
 async function updateDashboard(lat, lon, countryName, locationName, bbox = null) {
@@ -293,7 +405,11 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
     const latestPrecip = getLatestMetric(precipData, chartLookupName);
     const riskAssessment = determinePrimaryRisk(chartLookupName); 
 
-    // 2. Build the popup content
+    // 2. Apply risk color coding & get marker style
+    // 🌟 Pass countryName to the highlight function for GeoJSON lookup
+    const markerIcon = highlightCountryLayer(countryName, riskAssessment.magnitude, { bbox: bbox });
+
+    // 3. Build the popup content
     let popupContent = `
         <b>${locationName}</b>
         <hr style="margin: 4px 0;">
@@ -303,7 +419,7 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
             💧 Precip (${latestPrecip.year}): <b>${latestPrecip.value} mm</b>
         </p>
         <hr style="margin: 4px 0;">
-        <p style="font-size: 1.1em; font-weight: bold; color: ${riskAssessment.magnitude === 'High' ? '#FF5733' : '#FFC300'};">
+        <p style="font-size: 1.1em; font-weight: bold; color: ${getRiskColor(riskAssessment.magnitude)};">
             🚨 Primary Risk: ${riskAssessment.primaryRisk} (${riskAssessment.magnitude})
         </p>
         <p style="font-size: 0.9em; margin-top: 4px;">
@@ -311,40 +427,42 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
         </p>
     `;
 
-    // 3. Map updates
-    map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
-    const newMarker = L.marker([lat, lon]) // Store marker reference
+    // 4. Map updates
+    map.eachLayer(layer => { 
+        if(layer instanceof L.Marker) {
+            map.removeLayer(layer); 
+        }
+    });
+
+    const newMarker = L.marker([lat, lon], { icon: markerIcon }) // Use the custom colored icon
         .addTo(map)
         .bindPopup(popupContent); 
     
-    // Check for Bounding Box (from search)
-    if(bbox) {
+    // If GeoJSON highlight was successful, it will already have fit the bounds. 
+    // Only fall back to BBOX fit if the bounding box is present and no GeoJSON fit was performed.
+    if(bbox && !countryLayer) {
         map.fitBounds([[bbox[0], bbox[2]],[bbox[1], bbox[3]]], {padding:[50,50], maxZoom:10});
-    } else {
-        // If no BBOX (i.e., map click), zoom slightly if needed
+    } else if (!countryLayer) {
         map.setView([lat, lon], map.getZoom() > 5 ? map.getZoom() : 5); 
     }
 
-    // 🌟 FIX: Force the map view to the marker location *after* zoom/pan/fitBounds
-    // This ensures the popup is centered and visible.
+    // 🌟 Ensure marker popup is visible and centered
     map.setView(newMarker.getLatLng(), map.getZoom(), {
         animate: true,
         pan: {
             duration: 0.5
         }
     });
-    newMarker.openPopup(); // Re-open the popup after map movement
+    newMarker.openPopup(); 
 
-    // 4. Update charts
+    // 5. Update charts
     updateCountryCharts(chartLookupName);
 
-    // 5. AI analysis 
-    // 🌟 FIX: Pass the full risk assessment data structure to the AI function
+    // 6. AI analysis 
     const aiClimateData = {
         currentAvgTemp: latestTemp.value,
         tempAnomaly: riskAssessment.tempAnomaly,
-        seaLevelRise: (Math.random()*1+3).toFixed(1), // Retain mock sea level data
-        // Pass the new risk metrics:
+        seaLevelRise: (Math.random()*1+3).toFixed(1), 
         primaryRisk: riskAssessment.primaryRisk,
         magnitude: riskAssessment.magnitude,
         precipChange: riskAssessment.precipChange
@@ -353,7 +471,7 @@ async function updateDashboard(lat, lon, countryName, locationName, bbox = null)
 }
 
 // ----------------------------
-// Search Handler (MODIFIED TO USE updateDashboard - UNCHANGED)
+// Search Handler (UNCHANGED)
 // ----------------------------
 async function handleSearch() {
     const searchInput = document.getElementById('location-search');
@@ -390,7 +508,7 @@ async function handleSearch() {
 }
 
 /**
- * 🌟 NEW: Handles map click event (MODIFIED TO USE updateDashboard - UNCHANGED)
+ * Handles map click event (UNCHANGED)
  */
 async function handleMapClick(e) {
     const lat = e.latlng.lat;
@@ -401,11 +519,15 @@ async function handleMapClick(e) {
     if (result && result.countryName) {
         console.log(`Map Clicked: Country found: ${result.countryName}`);
         
+        // Fetch the BBOX separately for the boundary highlight, since reverse geocode doesn't provide it
+        const geoResult = await geocodeLocation(result.countryName); 
+        
         await updateDashboard(
             lat, 
             lon, 
             result.countryName, 
-            result.locationName
+            result.locationName,
+            geoResult ? geoResult.bbox : null // Pass BBOX from the forward geocode lookup
         );
     } else {
         alert("Could not retrieve country data for this location. Try searching or clicking closer to land.");
