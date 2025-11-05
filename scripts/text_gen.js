@@ -1,3 +1,5 @@
+
+import CONFIG from './config.js';
 /**
  * text_gen.js
  * Contains logic for generating the AI-powered climate analysis text using OpenRouter.ai.
