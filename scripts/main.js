@@ -40,7 +40,7 @@ function initializeDashboard() {
     });
 
     // Load temperature CSV
-    Papa.parse('./tidy-temperature.csv', {
+    Papa.parse('./data/tidy-temperature.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
@@ -52,7 +52,7 @@ function initializeDashboard() {
     });
 
     // Load precipitation CSV
-    Papa.parse('./tidy-percipitation.csv', {
+    Papa.parse('./data/tidy-percipitation.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
