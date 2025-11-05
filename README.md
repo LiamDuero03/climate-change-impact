@@ -23,6 +23,6 @@ This is an **interactive web map** that allows users to select any location glob
 ---
 
 ### 📝 **Contributors**
-* [Your Name (GitHub Link)]
+* [Liam Duero](https://github.com/LiamDuero03)
 * [Claire O'Gara](https://github.com/ClaireOG)
 * [Sean Hogan](https://github.com/seandhogan02-svg)
