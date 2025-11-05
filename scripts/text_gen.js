@@ -1,5 +1,5 @@
 
-import CONFIG from './config.js';
+
 /**
  * text_gen.js
  * Contains logic for generating the AI-powered climate analysis text using OpenRouter.ai.
@@ -7,7 +7,7 @@ import CONFIG from './config.js';
 
 // ⚠️ WARNING: REPLACE THIS LINE with your actual OpenRouter API Key.
 // For security, never commit this key to a public repository!
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || CONFIG.OPENROUTER_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const AI_MODEL = "moonshotai/kimi-k2:free";
 const API_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
