@@ -4,65 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Climate Impact Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4CAF50', // A climate-friendly green
+                        'dark-bg': '#121212',
+                        'card-bg': '#1e1e1e',
+                        'light-text': '#e0e0e0',
+                    }
+                }
+            }
+        }
+    </script>
+
     <link rel="stylesheet" href="styles/main.css">
-    </head>
-<body>
+</head>
 
-    <header class="dashboard-header">
-        <h1>🌍 Climate Impact Explorer</h1>
-        <p>Visualizing the effects of a changing climate worldwide.</p>
-        
-        <div class="search-container">
-            <input type="text" id="location-search" placeholder="Search for a location (e.g., city, country, region)...">
-            <button id="search-button">Search</button>
-        </div>
-    </header>
+<body class="bg-dark-bg text-light-text min-h-screen">
 
-    <main class="dashboard-main">
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         
-        <section class="map-section">
-            <h2>Interactive Impact Map</h2>
-            <div id="impact-map" class="map-container">
-                
+        <header class="bg-card-bg rounded-xl shadow-2xl p-6 mb-8 border-b-4 border-primary text-center">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-primary mb-2">
+                🌍 Climate Impact Explorer
+            </h1>
+            <p class="text-xl text-gray-400">Visualizing the effects of a changing climate worldwide.</p>
+            
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mt-6">
+                <input 
+                    type="text" 
+                    id="location-search" 
+                    placeholder="Search for a location (city, country)..."
+                    class="w-full sm:w-2/5 p-3 rounded-lg border-2 border-gray-700 bg-gray-800 text-light-text focus:outline-none focus:border-primary transition duration-300"
+                >
+                <button 
+                    id="search-button"
+                    class="w-full sm:w-auto px-6 py-3 bg-primary hover:bg-green-600 text-white font-semibold rounded-lg shadow-md transition duration-300"
+                >
+                    Search Impact
+                </button>
             </div>
-            <p class="map-caption">Click on a region or use the search bar to explore detailed data.</p>
-        </section>
+        </header>
 
-        <hr>
-
-        <section class="graphs-section">
-            <h2>Detailed Data Visualizations</h2>
-            <div class="graphs-grid">
+        <main>
+            
+            <section class="mb-12">
+                <h2 class="text-3xl font-bold text-primary mb-4 border-b border-gray-700 pb-2">Interactive Impact Map</h2>
                 
-                <div class="graph-box" id="graph-temp-anomaly">
-                    <h3>Temperature Anomaly</h3>
-                    <canvas id="chart-temp"></canvas>
+                <div id="impact-map" class="h-[500px] w-full bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+                    </div>
+                <p class="mt-3 text-center text-gray-400 italic">Click on a region or use the search bar to explore detailed data.</p>
+            </section>
+
+            <hr class="border-gray-700 my-10">
+
+            <section>
+                <h2 class="text-3xl font-bold text-primary mb-6 border-b border-gray-700 pb-2">Detailed Data Visualizations</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    
+                    <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-temp-anomaly">
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Temperature Anomaly</h3>
+                        <canvas id="chart-temp" class="h-64"></canvas>
                     </div>
 
-                <div class="graph-box" id="graph-sea-level">
-                    <h3>Sea Level Change</h3>
-                    <canvas id="chart-sea"></canvas>
+                    <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-sea-level">
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Sea Level Change</h3>
+                        <canvas id="chart-sea" class="h-64"></canvas>
                     </div>
 
-                <div class="graph-box" id="graph-co2">
-                    <h3>Atmospheric $\text{CO}_2$</h3>
-                    <canvas id="chart-co2"></canvas>
+                    <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-co2">
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Atmospheric $\text{CO}_2$</h3>
+                        <canvas id="chart-co2" class="h-64"></canvas>
                     </div>
 
-                <div class="graph-box" id="graph-custom">
-                    <h3>Regional Metric</h3>
-                    <p>Data will load here after search...</p>
-                    <canvas id="chart-custom"></canvas>
+                    <div class="graph-box bg-card-bg p-5 rounded-lg shadow-lg hover:shadow-2xl transition duration-300 transform hover:scale-[1.02]" id="graph-custom">
+                        <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2">Regional Metric</h3>
+                        <canvas id="chart-custom" class="h-64"></canvas>
+                        <p class="text-gray-500 text-sm mt-2">Data will load here after search...</p>
+                    </div>
+                    
                 </div>
-                
-            </div>
-        </section>
+            </section>
 
-    </main>
+        </main>
 
-    <footer class="dashboard-footer">
-        <p>&copy; 2025 Climate Impact Dashboard | Data provided by relevant APIs.</p>
-    </footer>
+        <footer class="mt-12 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm">
+            <p>&copy; 2025 Climate Impact Dashboard | Data provided by relevant APIs.</p>
+        </footer>
+
+    </div>
 
     <script src="scripts/main.js"></script>
 
