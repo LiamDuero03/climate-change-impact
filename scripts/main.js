@@ -54,7 +54,7 @@ function initializeDashboard() {
     });
 
     // Load CSV data
-    Papa.parse('./temperature-data.csv', {
+    Papa.parse('./tidy-temperature.csv', {
         download: true,
         header: true,
         dynamicTyping: true,
