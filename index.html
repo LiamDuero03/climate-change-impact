@@ -3,13 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Climate Impact Tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
+    <title>Climate Impact Dashboard</title>
+    <link rel="stylesheet" href="styles/main.css">
+    </head>
 <body>
-    <h1>Welcome to the Climate Impact Project!</h1>
-    <p>This is the start of our static website.</p>
 
-    <script src="script.js"></script>
+    <header class="dashboard-header">
+        <h1>🌍 Climate Impact Explorer</h1>
+        <p>Visualizing the effects of a changing climate worldwide.</p>
+        
+        <div class="search-container">
+            <input type="text" id="location-search" placeholder="Search for a location (e.g., city, country, region)...">
+            <button id="search-button">Search</button>
+        </div>
+    </header>
+
+    <main class="dashboard-main">
+        
+        <section class="map-section">
+            <h2>Interactive Impact Map</h2>
+            <div id="impact-map" class="map-container">
+                
+            </div>
+            <p class="map-caption">Click on a region or use the search bar to explore detailed data.</p>
+        </section>
+
+        <hr>
+
+        <section class="graphs-section">
+            <h2>Detailed Data Visualizations</h2>
+            <div class="graphs-grid">
+                
+                <div class="graph-box" id="graph-temp-anomaly">
+                    <h3>Temperature Anomaly</h3>
+                    <canvas id="chart-temp"></canvas>
+                    </div>
+
+                <div class="graph-box" id="graph-sea-level">
+                    <h3>Sea Level Change</h3>
+                    <canvas id="chart-sea"></canvas>
+                    </div>
+
+                <div class="graph-box" id="graph-co2">
+                    <h3>Atmospheric $\text{CO}_2$</h3>
+                    <canvas id="chart-co2"></canvas>
+                    </div>
+
+                <div class="graph-box" id="graph-custom">
+                    <h3>Regional Metric</h3>
+                    <p>Data will load here after search...</p>
+                    <canvas id="chart-custom"></canvas>
+                </div>
+                
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="dashboard-footer">
+        <p>&copy; 2025 Climate Impact Dashboard | Data provided by relevant APIs.</p>
+    </footer>
+
+    <script src="scripts/main.js"></script>
+
 </body>
 </html>
