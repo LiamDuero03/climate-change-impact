@@ -18,8 +18,8 @@ This is an **interactive web map** that allows users to select any location glob
 ---
 
 ### 🚀 **Try the Live Demo**
-**[Launch Climate Explorer on Vercel](https://climate-explorer-hackathon.vercel.app/)**
-*(Note: Please replace this with your actual Vercel deployment link)*
+**[Launch Climate Explorer on Vercel]([https://climate-explorer-hackathon.vercel.app/](https://climate-change-impact.vercel.app/))**
+
 
 ---
 
