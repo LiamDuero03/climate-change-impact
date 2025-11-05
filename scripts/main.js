@@ -62,16 +62,19 @@ function initializeDashboard() {
         complete: function(results) {
             climateData = results.data;
             console.log("CSV data loaded:", climateData.length, "rows");
+
+            // Show global metrics by default
+            updateGlobalCharts();
         }
     });
 }
 
-// Helper: Normalize country names
+// Normalize country names for matching
 function normalizeCountry(name) {
     return name.replace(/\s*\(.*\)/, '').trim().toLowerCase();
 }
 
-// Get country data from CSV
+// Get country data
 function getCountryData(searchName) {
     const normSearch = normalizeCountry(searchName);
     const filtered = climateData.filter(d => normalizeCountry(d.name) === normSearch);
@@ -81,13 +84,48 @@ function getCountryData(searchName) {
     return { labels, values };
 }
 
-// Update charts with selected country
-function updateTemperatureChart(countryName) {
+// Get global averages per year
+function getGlobalData() {
+    const byYear = {};
+    climateData.forEach(d => {
+        const year = new Date(d.year).getFullYear();
+        if (!byYear[year]) byYear[year] = [];
+        byYear[year].push(d.value);
+    });
+
+    const labels = Object.keys(byYear).sort((a,b)=>a-b);
+    const values = labels.map(y => {
+        const vals = byYear[y];
+        return (vals.reduce((sum,v)=>sum+v,0)/vals.length).toFixed(2);
+    });
+
+    return { labels, values };
+}
+
+// Update charts with global data
+function updateGlobalCharts() {
+    const { labels, values } = getGlobalData();
+
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = values;
+    tempChart.data.datasets[0].label = `Global Avg Temperature (°C)`;
+    tempChart.update();
+
+    customChart.data.labels = labels;
+    customChart.data.datasets[0].data = values;
+    customChart.data.datasets[0].label = `Global Regional Metric`;
+    customChart.update();
+}
+
+// Update charts with country-specific data
+function updateCountryCharts(countryName) {
     const { labels, values } = getCountryData(countryName);
-    if (labels.length === 0) {
-        console.warn(`No CSV data found for "${countryName}"`);
+    if(labels.length === 0) {
+        console.warn(`No CSV data for "${countryName}"`);
+        updateGlobalCharts();
         return;
     }
+
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = values;
     tempChart.data.datasets[0].label = `${countryName} Temperature (°C)`;
@@ -99,35 +137,63 @@ function updateTemperatureChart(countryName) {
     customChart.update();
 }
 
-// Geocoding function remains unchanged
-async function geocodeLocation(location) { /* ...existing code... */ }
+// Geocoding function
+async function geocodeLocation(location) { 
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
+    try {
+        const response = await fetch(url);
+        if(!response.ok) throw new Error('Geocoding failed');
+        const data = await response.json();
+        if(data && data.length>0) {
+            const result = data[0];
+            const nameParts = result.display_name.split(',').map(s=>s.trim());
+            const displayLocation = nameParts.length>1 ? nameParts[0]+', '+nameParts.slice(-1)[0] : nameParts[0];
+            return {
+                lat: parseFloat(result.lat),
+                lon: parseFloat(result.lon),
+                locationName: displayLocation,
+                bbox: result.boundingbox.map(Number)
+            };
+        }
+        return null;
+    } catch(err) {
+        console.error("Geocoding error:", err);
+        return null;
+    }
+}
 
-// Handle search & update map + charts
+// Handle search
 async function handleSearch() {
     const searchInput = document.getElementById('location-search');
     const location = searchInput.value.trim();
-    if (!location) { alert('Please enter a location'); return; }
-
     const searchButton = document.getElementById('search-button');
+
     searchButton.textContent = 'Searching...';
     searchButton.disabled = true;
+
+    if(!location) {
+        updateGlobalCharts();
+        searchButton.textContent = 'Search Impact';
+        searchButton.disabled = false;
+        return;
+    }
 
     const coords = await geocodeLocation(location);
 
     searchButton.textContent = 'Search Impact';
     searchButton.disabled = false;
 
-    if (coords) {
+    if(coords) {
         map.eachLayer(layer => { if(layer instanceof L.Marker) map.removeLayer(layer); });
         L.marker([coords.lat, coords.lon]).addTo(map)
             .bindPopup(`Impact Data for <b>${coords.locationName}</b>`).openPopup();
         if(coords.bbox) map.fitBounds([[coords.bbox[0], coords.bbox[2]],[coords.bbox[1], coords.bbox[3]]], {padding:[50,50], maxZoom:10});
         else map.setView([coords.lat, coords.lon], 10);
 
-        // Update charts with CSV data
-        updateTemperatureChart(coords.locationName);
+        // Update charts
+        updateCountryCharts(coords.locationName);
 
-        // AI analysis
+        // AI analysis (optional)
         const mockClimateData = {
             currentAvgTemp: (Math.random()*5+10).toFixed(2),
             tempAnomaly: (Math.random()*0.5+0.8).toFixed(2),
@@ -138,6 +204,7 @@ async function handleSearch() {
 
     } else {
         alert(`Could not find "${location}".`);
+        updateGlobalCharts();
     }
 }
 
