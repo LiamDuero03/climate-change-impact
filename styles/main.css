@@ -1,38 +1,80 @@
-/* General Reset - Good to keep this minimal, universal reset */
+/* -------------------------------
+   General Reset
+-------------------------------- */
 * {
     box-sizing: border-box;
-    /* Removed margin/padding reset as Tailwind's Preflight handles this */
 }
 
-/* Ensure the Leaflet map container initializes correctly */
+/* -------------------------------
+   Leaflet Map
+-------------------------------- */
 .leaflet-container {
-    /* This rule is crucial for Leaflet to display properly */
-    background-color: transparent; 
+    background-color: transparent;
+    width: 100%;
+    height: 100%;
 }
 
-/* Custom Styling for the Graph Boxes */
-/* We keep the class .graph-box and its hover effect */
-/* NOTE: The lift effect (transform: translateY) is already on the HTML element 
-   with Tailwind's 'hover:scale-[1.02]'. This custom hover is optional/redundant 
-   unless you want a very specific effect here. */
+/* -------------------------------
+   Graph Boxes
+-------------------------------- */
+.graph-box {
+    /* Taller for better readability */
+    height: 24rem; /* ~h-96 equivalent */
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.graph-box canvas {
+    flex: 1;               /* Canvas fills the available height */
+    width: 100% !important;
+    height: 100% !important;
+}
 
 .graph-box:hover {
-    /* Use this to add a subtle shadow specific to the custom class */
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); /* Subtle green glow on hover */
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); /* Subtle green glow */
 }
 
-/* Highly Custom: Horizontal Rule Styling */
-/* This gradient is difficult to achieve purely with Tailwind utilities, so we keep it. */
-hr.border-gray-700 { /* Targeting the specific hr class from the HTML */
+/* -------------------------------
+   Horizontal Rule Styling
+-------------------------------- */
+hr.border-gray-700 {
     border: 0;
     height: 1px;
-    /* Create a gradient effect for the divider line */
     background-image: linear-gradient(to right, rgba(255, 255, 255, 0), #4CAF50, rgba(255, 255, 255, 0));
 }
 
-/*
---- REMOVED STYLES ---
-- General body/h1/h2/h3 styles: These are handled by Tailwind's bg-dark-bg, text-light-text, and text-primary classes on the body/elements.
-- All .dashboard-header, .search-container, #location-search, #search-button styles: These are fully managed by Tailwind utility classes in the HTML.
-- Layouts like .dashboard-main, .graphs-grid: These are managed by max-w-7xl, mx-auto, and the grid utility classes in the HTML.
-*/
+/* -------------------------------
+   AI Response Box
+-------------------------------- */
+#ai-response-box {
+    min-height: 150px;
+    background-color: #1e1e1e;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+/* -------------------------------
+   Grid Layout for Charts (Stacked)
+-------------------------------- */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* Single column by default */
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    /* Two columns on large screens */
+    .charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* -------------------------------
+   Scroll Fix for Charts
+-------------------------------- */
+body {
+    overflow-x: hidden;
+}
